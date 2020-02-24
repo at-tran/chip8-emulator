@@ -1,1 +1,2 @@
-import("../pkg/index.js").catch(console.error);
+import("./app.js")
+    .catch(e => console.error("Error importing `app.js`:", e));
