@@ -21,14 +21,8 @@ npm run build
 ## How to run unit tests
 
 ```sh
-# Runs tests in Firefox
-npm test -- --firefox
-
 # Runs tests in Chrome
-npm test -- --chrome
-
-# Runs tests in Safari
-npm test -- --safari
+npm test
 ```
 
 ## What does each file do?
