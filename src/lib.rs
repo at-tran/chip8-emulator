@@ -92,25 +92,32 @@ struct Timer {
     performance: web_sys::Performance,
 }
 
+
 impl Timer {
+    const INTERVAL: f64 = 1000.0 / 60.0;
+
     fn new() -> Timer {
         let performance = web_sys::window().unwrap().performance().unwrap();
         Timer {
             value: 0,
-            next_time: performance.now(),
+            next_time: performance.now() + Timer::INTERVAL,
             performance,
         }
     }
 
     fn step(&mut self) {
-        if self.performance.now() > self.next_time {
+        if self.performance.now() >= self.next_time {
             self.value = self.value.saturating_sub(1);
-            self.next_time += 1000.0 / 60.0;
+            self.next_time += Timer::INTERVAL;
         }
     }
 
     fn value(&self) -> u8 {
         self.value
+    }
+
+    fn set_value(&mut self, value: u8) {
+        self.value = value;
     }
 }
 
@@ -129,6 +136,9 @@ pub fn main_js() {
 #[cfg(test)]
 mod tests {
     use crate::*;
+
+    use wasm_bindgen_test::{wasm_bindgen_test_configure, wasm_bindgen_test};
+    wasm_bindgen_test_configure!(run_in_browser);
 
     #[test]
     fn test_graphics_toggle() {
@@ -150,5 +160,28 @@ mod tests {
         assert_eq!(gfx.toggle(1, 1), true);
         assert!(gfx.display[0] && !gfx.display[1] &&
             !gfx.display[2] && !gfx.display[3]);
+    }
+
+    #[wasm_bindgen_test]
+    fn test_timer() {
+        let performance = web_sys::window().unwrap().performance().unwrap();
+        let mut t = Timer::new();
+        t.set_value(5);
+
+        let now = performance.now();
+        while performance.now() - now < Timer::INTERVAL {}
+        t.step();
+        t.step();
+        t.step();
+        t.step();
+        assert_eq!(t.value(), 4);
+
+        let now = performance.now();
+        while performance.now() - now < 2.0 * Timer::INTERVAL {}
+        t.step();
+        t.step();
+        t.step();
+        t.step();
+        assert_eq!(t.value(), 2);
     }
 }

@@ -1,6 +1,6 @@
 {
   "author": "You <you@example.com>",
-  "name": "rust-webpack-template",
+  "name": "chip8-emulator",
   "version": "0.1.0",
   "scripts": {
     "build": "rimraf dist pkg && webpack",
