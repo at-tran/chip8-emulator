@@ -1,8 +1,11 @@
+mod timer;
+mod graphics;
+
 use wasm_bindgen::prelude::*;
 use web_sys::console;
-use fixedbitset::FixedBitSet;
 use arrayvec::ArrayVec;
-use core::ops::AddAssign;
+use timer::Timer;
+use graphics::Graphics;
 
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
@@ -18,12 +21,12 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub struct Chip8Emulator {
     memory: [u8; 4096],
     V: [u8; 16],
-    I: MemoryAddress,
-    pc: MemoryAddress,
+    I: u16,
+    pc: u16,
     gfx: Graphics,
     delay_timer: Timer,
     sound_timer: Timer,
-    stack: ArrayVec<[MemoryAddress; 16]>,
+    stack: ArrayVec<[u16; 16]>,
     keypad: [bool; 16],
 }
 
@@ -35,8 +38,8 @@ impl Chip8Emulator {
         Chip8Emulator {
             memory: [0; 4096],
             V: [0; 16],
-            I: MemoryAddress::new(0),
-            pc: MemoryAddress::new(PROGRAM_MEMORY_START),
+            I: 0,
+            pc: PROGRAM_MEMORY_START as u16,
             gfx: Graphics::new(),
             delay_timer: Timer::new(),
             sound_timer: Timer::new(),
@@ -48,108 +51,11 @@ impl Chip8Emulator {
     pub fn load_rom(&mut self, rom_data: &[u8]) {
         let end_index = PROGRAM_MEMORY_START + rom_data.len();
         self.memory[PROGRAM_MEMORY_START..end_index].clone_from_slice(rom_data);
-        for i in 0..20 {
-            console::log_1(&self.memory[(PROGRAM_MEMORY_START + i) as usize].into())
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
-struct MemoryAddress(usize);
-
-impl MemoryAddress {
-    fn new(addr: usize) -> MemoryAddress {
-        assert!(addr <= 0x0FFF,
-                "Memory address {:X} out of bounds (0x000 to 0xFFF)", addr);
-
-        MemoryAddress(addr)
     }
 
-    fn value(&self) -> usize {
-        self.0
+    pub fn reset(&mut self) {
+        *self = Chip8Emulator::new();
     }
-}
-
-impl AddAssign<usize> for MemoryAddress {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = MemoryAddress::new(self.0 + rhs)
-    }
-}
-
-struct Graphics {
-    width: usize,
-    height: usize,
-    display: FixedBitSet,
-}
-
-impl Graphics {
-    fn new() -> Graphics {
-        let width = 64;
-        let height = 32;
-        let display = FixedBitSet::with_capacity(width * height);
-        Graphics { width, height, display }
-    }
-
-    /// Toggles the pixel at column `x` and row `y` (0-indexed) on the display
-    /// and returns whether a pixel was toggled from on to off.
-    fn toggle(&mut self, x: usize, y: usize) -> bool {
-        if x >= self.width || y >= self.height {
-            panic!("Pixel ({}, {}) is out of bounds of display size {}x{}",
-                   x, y, self.width, self.height);
-        }
-        let index = y * self.width + x;
-        let res = self.display[index];
-        self.display.toggle(index);
-        res
-    }
-
-    fn get_width(&self) -> usize {
-        self.width
-    }
-
-    fn get_height(&self) -> usize {
-        self.height
-    }
-}
-
-struct Timer {
-    value: u8,
-    prev_time: f64,
-}
-
-impl Timer {
-    const INTERVAL: f64 = 1000.0 / 60.0;
-
-    fn new() -> Timer {
-        Timer {
-            value: 0,
-            prev_time: now(),
-        }
-    }
-
-    fn step(&mut self) {
-        let ticks = (now() - self.prev_time) / Timer::INTERVAL;
-        assert!(ticks >= 0.0, "Current time less than previous time");
-        self.value = self.value.saturating_sub(ticks as u8);
-        self.prev_time += ticks.floor() * Timer::INTERVAL;
-    }
-
-    fn value(&self) -> u8 {
-        self.value
-    }
-
-    fn set_value(&mut self, value: u8) {
-        self.value = value;
-    }
-}
-
-thread_local! {
-    static performance: web_sys::Performance =
-        web_sys::window().unwrap().performance().unwrap();
-}
-
-fn now() -> f64 {
-    performance.with(|p| { p.now() })
 }
 
 // This is like the `main` function, except for JavaScript.
@@ -166,52 +72,23 @@ pub fn main_js() {
 
 #[cfg(test)]
 mod tests {
-    use crate::*;
-
+    use super::*;
     use wasm_bindgen_test::{wasm_bindgen_test_configure, wasm_bindgen_test};
     wasm_bindgen_test_configure!(run_in_browser);
 
-    #[test]
-    fn test_graphics_toggle() {
-        use fixedbitset::FixedBitSet;
-        let mut gfx = Graphics {
-            width: 2,
-            height: 2,
-            display: FixedBitSet::with_capacity(4),
-        };
-
-        gfx.display.insert(2);
-        assert_eq!(gfx.toggle(0, 1), true);
-        assert_eq!(gfx.toggle(0, 1), false);
-        assert!(gfx.display[2]);
-        assert_eq!(gfx.toggle(0, 1), true);
-        assert_eq!(gfx.toggle(1, 1), false);
-        assert!(gfx.display[3]);
-        assert_eq!(gfx.toggle(0, 0), false);
-        assert_eq!(gfx.toggle(1, 1), true);
-        assert!(gfx.display[0] && !gfx.display[1] &&
-            !gfx.display[2] && !gfx.display[3]);
-    }
-
     #[wasm_bindgen_test]
-    fn test_timer() {
-        let mut timer = Timer::new();
-        assert_eq!(timer.value(), 0);
-        timer.set_value(5);
+    fn test_load_rom() {
+        let mut chip8 = Chip8Emulator::new();
+        let data = [1u8, 5, 3, 5, 1, 255, 9];
+        chip8.load_rom(&data);
 
-        let t = now();
-        // Add 2ms to give enough for timer.step()
-        while now() + 2.0 - t < Timer::INTERVAL { timer.step(); }
-        assert_eq!(timer.value(), 5);
-        while now() + 2.0 - t < 2.0 * Timer::INTERVAL { timer.step(); }
-        assert_eq!(timer.value(), 4);
+        for i in 0..data.len() {
+            assert_eq!(chip8.memory[PROGRAM_MEMORY_START + i], data[i]);
+        }
 
-        let t = now();
-        while now() - t < 2.0 * Timer::INTERVAL {}
-        timer.step();
-        assert_eq!(timer.value(), 2);
-
-        while now() - t < 5.0 * Timer::INTERVAL { timer.step(); }
-        assert_eq!(timer.value(), 0);
+        for i in 0..5 {
+            assert_eq!(chip8.memory[PROGRAM_MEMORY_START - i - 1], 0);
+            assert_eq!(chip8.memory[PROGRAM_MEMORY_START + data.len() + i], 0);
+        }
     }
 }
