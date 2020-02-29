@@ -1,6 +1,8 @@
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 use fixedbitset::FixedBitSet;
+use arrayvec::ArrayVec;
+use core::ops::AddAssign;
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
 // allocator.
@@ -17,22 +19,33 @@ pub struct Chip8Emulator {
     I: MemoryAddress,
     pc: MemoryAddress,
     gfx: Graphics,
+    delay_timer: Timer,
+    sound_timer: Timer,
+    stack: ArrayVec<[MemoryAddress; 16]>,
+    keypad: [u8; 16],
 }
+
+impl Chip8Emulator {}
 
 #[derive(Copy, Clone)]
 struct MemoryAddress(u16);
 
 impl MemoryAddress {
     fn new(addr: u16) -> MemoryAddress {
-        if addr > 0x0FFF {
-            panic!("Memory address {:X} out of bounds (0x000 to 0xFFF)", addr);
-        }
+        assert!(addr <= 0x0FFF,
+                "Memory address {:X} out of bounds (0x000 to 0xFFF)", addr);
 
         MemoryAddress(addr)
     }
 
     fn value(&self) -> u16 {
         self.0
+    }
+}
+
+impl AddAssign<u16> for MemoryAddress {
+    fn add_assign(&mut self, rhs: u16) {
+        *self = MemoryAddress::new(self.0 + rhs)
     }
 }
 
@@ -62,8 +75,44 @@ impl Graphics {
         self.display.toggle(index);
         res
     }
+
+    fn get_width(&self) -> usize {
+        self.width
+    }
+
+    fn get_height(&self) -> usize {
+        self.height
+    }
 }
 
+
+struct Timer {
+    value: u8,
+    next_time: f64,
+    performance: web_sys::Performance,
+}
+
+impl Timer {
+    fn new() -> Timer {
+        let performance = web_sys::window().unwrap().performance().unwrap();
+        Timer {
+            value: 0,
+            next_time: performance.now(),
+            performance,
+        }
+    }
+
+    fn step(&mut self) {
+        if self.performance.now() > self.next_time {
+            self.value = self.value.saturating_sub(1);
+            self.next_time += 1000.0 / 60.0;
+        }
+    }
+
+    fn value(&self) -> u8 {
+        self.value
+    }
+}
 
 // This is like the `main` function, except for JavaScript.
 #[wasm_bindgen(start)]
