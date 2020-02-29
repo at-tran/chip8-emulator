@@ -4,6 +4,7 @@ use fixedbitset::FixedBitSet;
 use arrayvec::ArrayVec;
 use core::ops::AddAssign;
 
+
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
 // allocator.
 //
@@ -11,6 +12,7 @@ use core::ops::AddAssign;
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
 
 #[wasm_bindgen]
 pub struct Chip8Emulator {
@@ -22,29 +24,54 @@ pub struct Chip8Emulator {
     delay_timer: Timer,
     sound_timer: Timer,
     stack: ArrayVec<[MemoryAddress; 16]>,
-    keypad: [u8; 16],
+    keypad: [bool; 16],
 }
 
-impl Chip8Emulator {}
+const PROGRAM_MEMORY_START: usize = 0x200;
+
+#[wasm_bindgen]
+impl Chip8Emulator {
+    pub fn new() -> Chip8Emulator {
+        Chip8Emulator {
+            memory: [0; 4096],
+            V: [0; 16],
+            I: MemoryAddress::new(0),
+            pc: MemoryAddress::new(PROGRAM_MEMORY_START),
+            gfx: Graphics::new(),
+            delay_timer: Timer::new(),
+            sound_timer: Timer::new(),
+            stack: ArrayVec::new(),
+            keypad: [false; 16],
+        }
+    }
+
+    pub fn load_rom(&mut self, rom_data: &[u8]) {
+        let end_index = PROGRAM_MEMORY_START + rom_data.len();
+        self.memory[PROGRAM_MEMORY_START..end_index].clone_from_slice(rom_data);
+        for i in 0..20 {
+            console::log_1(&self.memory[(PROGRAM_MEMORY_START + i) as usize].into())
+        }
+    }
+}
 
 #[derive(Copy, Clone)]
-struct MemoryAddress(u16);
+struct MemoryAddress(usize);
 
 impl MemoryAddress {
-    fn new(addr: u16) -> MemoryAddress {
+    fn new(addr: usize) -> MemoryAddress {
         assert!(addr <= 0x0FFF,
                 "Memory address {:X} out of bounds (0x000 to 0xFFF)", addr);
 
         MemoryAddress(addr)
     }
 
-    fn value(&self) -> u16 {
+    fn value(&self) -> usize {
         self.0
     }
 }
 
-impl AddAssign<u16> for MemoryAddress {
-    fn add_assign(&mut self, rhs: u16) {
+impl AddAssign<usize> for MemoryAddress {
+    fn add_assign(&mut self, rhs: usize) {
         *self = MemoryAddress::new(self.0 + rhs)
     }
 }
@@ -102,7 +129,7 @@ impl Timer {
 
     fn step(&mut self) {
         let ticks = (now() - self.prev_time) / Timer::INTERVAL;
-        assert!(ticks >= 0.0);
+        assert!(ticks >= 0.0, "Current time less than previous time");
         self.value = self.value.saturating_sub(ticks as u8);
         self.prev_time += ticks.floor() * Timer::INTERVAL;
     }
@@ -169,6 +196,7 @@ mod tests {
     #[wasm_bindgen_test]
     fn test_timer() {
         let mut timer = Timer::new();
+        assert_eq!(timer.value(), 0);
         timer.set_value(5);
 
         let t = now();
@@ -182,5 +210,8 @@ mod tests {
         while now() - t < 2.0 * Timer::INTERVAL {}
         timer.step();
         assert_eq!(timer.value(), 2);
+
+        while now() - t < 5.0 * Timer::INTERVAL { timer.step(); }
+        assert_eq!(timer.value(), 0);
     }
 }
