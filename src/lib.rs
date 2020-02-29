@@ -85,31 +85,26 @@ impl Graphics {
     }
 }
 
-
 struct Timer {
     value: u8,
-    next_time: f64,
-    performance: web_sys::Performance,
+    prev_time: f64,
 }
-
 
 impl Timer {
     const INTERVAL: f64 = 1000.0 / 60.0;
 
     fn new() -> Timer {
-        let performance = web_sys::window().unwrap().performance().unwrap();
         Timer {
             value: 0,
-            next_time: performance.now() + Timer::INTERVAL,
-            performance,
+            prev_time: now(),
         }
     }
 
     fn step(&mut self) {
-        if self.performance.now() >= self.next_time {
-            self.value = self.value.saturating_sub(1);
-            self.next_time += Timer::INTERVAL;
-        }
+        let ticks = (now() - self.prev_time) / Timer::INTERVAL;
+        assert!(ticks >= 0.0);
+        self.value = self.value.saturating_sub(ticks as u8);
+        self.prev_time += ticks.floor() * Timer::INTERVAL;
     }
 
     fn value(&self) -> u8 {
@@ -119,6 +114,15 @@ impl Timer {
     fn set_value(&mut self, value: u8) {
         self.value = value;
     }
+}
+
+thread_local! {
+    static performance: web_sys::Performance =
+        web_sys::window().unwrap().performance().unwrap();
+}
+
+fn now() -> f64 {
+    performance.with(|p| { p.now() })
 }
 
 // This is like the `main` function, except for JavaScript.
@@ -164,24 +168,19 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn test_timer() {
-        let performance = web_sys::window().unwrap().performance().unwrap();
-        let mut t = Timer::new();
-        t.set_value(5);
+        let mut timer = Timer::new();
+        timer.set_value(5);
 
-        let now = performance.now();
-        while performance.now() - now < Timer::INTERVAL {}
-        t.step();
-        t.step();
-        t.step();
-        t.step();
-        assert_eq!(t.value(), 4);
+        let t = now();
+        // Add 2ms to give enough for timer.step()
+        while now() + 2.0 - t < Timer::INTERVAL { timer.step(); }
+        assert_eq!(timer.value(), 5);
+        while now() + 2.0 - t < 2.0 * Timer::INTERVAL { timer.step(); }
+        assert_eq!(timer.value(), 4);
 
-        let now = performance.now();
-        while performance.now() - now < 2.0 * Timer::INTERVAL {}
-        t.step();
-        t.step();
-        t.step();
-        t.step();
-        assert_eq!(t.value(), 2);
+        let t = now();
+        while now() - t < 2.0 * Timer::INTERVAL {}
+        timer.step();
+        assert_eq!(timer.value(), 2);
     }
 }
