@@ -1,8 +1,10 @@
 mod timer;
 mod graphics;
+mod keypad;
 
 use timer::Timer;
 use graphics::Graphics;
+use keypad::KeyPad;
 use arrayvec::ArrayVec;
 
 const WIDTH: u32 = 64;
@@ -18,7 +20,7 @@ pub struct Chip8Emulator {
     delay_timer: Timer,
     sound_timer: Timer,
     stack: ArrayVec<[u16; 16]>,
-    keypad: [bool; 16],
+    keypad: KeyPad,
 }
 
 impl Chip8Emulator {
@@ -32,7 +34,7 @@ impl Chip8Emulator {
             delay_timer: Timer::new(current_time),
             sound_timer: Timer::new(current_time),
             stack: ArrayVec::new(),
-            keypad: [false; 16],
+            keypad: KeyPad::new(),
         }
     }
 
@@ -60,7 +62,16 @@ impl Chip8Emulator {
     pub fn gfx_needs_rerender(&mut self) -> bool {
         self.gfx.needs_rerender()
     }
+
+    pub fn keydown(&mut self, key: u8) {
+        self.keypad.keydown(key);
+    }
+
+    pub fn keyup(&mut self, key: u8) {
+        self.keypad.keyup(key);
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
