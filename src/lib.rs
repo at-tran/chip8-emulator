@@ -2,10 +2,13 @@ mod timer;
 mod graphics;
 
 use wasm_bindgen::prelude::*;
-use web_sys::console;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::Response;
 use arrayvec::ArrayVec;
 use timer::Timer;
 use graphics::Graphics;
+use wasm_bindgen::JsCast;
+use js_sys::Uint8Array;
 
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
@@ -16,9 +19,9 @@ use graphics::Graphics;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+const ROMS_DIR: &str = "roms";
 
-#[wasm_bindgen]
-pub struct Chip8Emulator {
+struct Chip8Emulator {
     memory: [u8; 4096],
     V: [u8; 16],
     I: u16,
@@ -32,9 +35,8 @@ pub struct Chip8Emulator {
 
 const PROGRAM_MEMORY_START: usize = 0x200;
 
-#[wasm_bindgen]
 impl Chip8Emulator {
-    pub fn new() -> Chip8Emulator {
+    fn new() -> Chip8Emulator {
         Chip8Emulator {
             memory: [0; 4096],
             V: [0; 16],
@@ -48,26 +50,40 @@ impl Chip8Emulator {
         }
     }
 
-    pub fn load_rom(&mut self, rom_data: &[u8]) {
+    fn load_rom(&mut self, rom_data: &[u8]) {
         let end_index = PROGRAM_MEMORY_START + rom_data.len();
         self.memory[PROGRAM_MEMORY_START..end_index].clone_from_slice(rom_data);
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         *self = Chip8Emulator::new();
     }
 }
 
+async fn get_binary_file(path: &str) -> Result<Vec<u8>, JsValue> {
+    let window = web_sys::window().unwrap();
+    let resp_value = JsFuture::from(window.fetch_with_str(path)).await?;
+    let resp: Response = resp_value.dyn_into().unwrap();
+    let buffer = JsFuture::from(resp.array_buffer()?).await?;
+    Ok(Uint8Array::new(&buffer).to_vec())
+}
+
+
 // This is like the `main` function, except for JavaScript.
 #[wasm_bindgen(start)]
-pub fn main_js() {
+pub async fn main_js() {
     // This provides better error messages in debug mode.
     // It's disabled in release mode so it doesn't bloat up the file size.
     #[cfg(debug_assertions)]
         console_error_panic_hook::set_once();
 
-    // Your code goes here!
-    console::log_1(&"Hello world!".into());
+    let mut chip8 = Chip8Emulator::new();
+
+    let path = format!("{}/15PUZZLE", ROMS_DIR);
+    let buffer = get_binary_file(&path).await
+        .expect(&format!("Can't load {}", path));
+
+    chip8.load_rom(&buffer);
 }
 
 #[cfg(test)]
@@ -89,6 +105,17 @@ mod tests {
         for i in 0..5 {
             assert_eq!(chip8.memory[PROGRAM_MEMORY_START - i - 1], 0);
             assert_eq!(chip8.memory[PROGRAM_MEMORY_START + data.len() + i], 0);
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn test_reset() {
+        let mut chip8 = Chip8Emulator::new();
+        let data = [1u8, 5, 3, 5, 1, 255, 9];
+        chip8.load_rom(&data);
+        chip8.reset();
+        for i in 0..data.len() {
+            assert_eq!(chip8.memory[PROGRAM_MEMORY_START + i], 0);
         }
     }
 }
