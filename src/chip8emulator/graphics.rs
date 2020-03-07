@@ -1,41 +1,41 @@
 use fixedbitset::FixedBitSet;
 
 pub struct Graphics {
-    width: usize,
-    height: usize,
+    width: u32,
+    height: u32,
     display: FixedBitSet,
     changed: bool,
 }
 
 impl Graphics {
-    pub fn new(width: usize, height: usize) -> Graphics {
-        let display = FixedBitSet::with_capacity(width * height);
+    pub fn new(width: u32, height: u32) -> Graphics {
+        let display = FixedBitSet::with_capacity((width * height) as usize);
         Graphics { width, height, display, changed: false }
     }
 
     /// Toggles the pixel at column `x` and row `y` (0-indexed) on the display
     /// and returns whether a pixel was toggled from on to off.
-    pub fn toggle(&mut self, x: usize, y: usize) -> bool {
+    pub fn toggle(&mut self, x: u32, y: u32) -> bool {
         assert!(x < self.width && y < self.height,
                 "Pixel ({}, {}) is out of bounds of display size {}x{}",
                 x, y, self.width, self.height);
 
         let index = y * self.width + x;
         let res = self.display[index];
-        self.display.toggle(index);
+        self.display.toggle(index as usize);
         self.changed = true;
         res
     }
 
-    pub fn get_width(&self) -> usize {
+    pub fn get_width(&self) -> u32 {
         self.width
     }
 
-    pub fn get_height(&self) -> usize {
+    pub fn get_height(&self) -> u32 {
         self.height
     }
 
-    pub fn get_pixel(&self, x: usize, y: usize) -> bool {
+    pub fn get_pixel(&self, x: u32, y: u32) -> bool {
         self.display[y * self.width + x]
     }
 

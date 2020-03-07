@@ -5,8 +5,8 @@ use timer::Timer;
 use graphics::Graphics;
 use arrayvec::ArrayVec;
 
-const WIDTH: usize = 64;
-const HEIGHT: usize = 32;
+const WIDTH: u32 = 64;
+const HEIGHT: u32 = 32;
 const PROGRAM_MEMORY_START: usize = 0x200;
 
 pub struct Chip8Emulator {
@@ -45,15 +45,15 @@ impl Chip8Emulator {
         *self = Chip8Emulator::new(current_time);
     }
 
-    pub fn get_gfx_width(&self) -> usize {
+    pub fn get_gfx_width(&self) -> u32 {
         self.gfx.get_width()
     }
 
-    pub fn get_gfx_height(&self) -> usize {
+    pub fn get_gfx_height(&self) -> u32 {
         self.gfx.get_height()
     }
 
-    pub fn get_gfx_pixel(&self, x: usize, y: usize) -> bool {
+    pub fn get_gfx_pixel(&self, x: u32, y: u32) -> bool {
         self.gfx.get_pixel(x, y)
     }
 
