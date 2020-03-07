@@ -1,2 +1,2 @@
-import * as wasm from "../pkg/index.js";
+import "../pkg/index.js";
 import "../sass/style.sass";

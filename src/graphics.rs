@@ -34,6 +34,10 @@ impl Graphics {
     pub fn get_height(&self) -> usize {
         self.height
     }
+
+    pub fn get(&self, x: usize, y: usize) -> bool {
+        self.display[y * self.width + x]
+    }
 }
 
 #[cfg(test)]

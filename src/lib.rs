@@ -20,6 +20,8 @@ use js_sys::Uint8Array;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 const ROMS_DIR: &str = "roms";
+const WIDTH: usize = 64;
+const HEIGHT: usize = 32;
 
 struct Chip8Emulator {
     memory: [u8; 4096],
@@ -58,6 +60,43 @@ impl Chip8Emulator {
     fn reset(&mut self) {
         *self = Chip8Emulator::new();
     }
+
+    fn render(&self) {
+        let ctx = get_context();
+
+        let canvas = ctx.canvas().unwrap();
+        canvas.set_width(64);
+        canvas.set_height(32);
+
+        ctx.begin_path();
+
+        ctx.set_fill_style(&"#000000".into());
+        ctx.fill_rect(0.0, 0.0, WIDTH as f64, HEIGHT as f64);
+
+        ctx.set_fill_style(&"#00a86b".into());
+        for x in 0..WIDTH {
+            for y in 0..HEIGHT {
+                if self.gfx.get(x, y) {
+                    ctx.fill_rect(x as f64, y as f64, 1.0, 1.0);
+                }
+            }
+        }
+
+        ctx.stroke();
+    }
+}
+
+thread_local! {
+static _context: web_sys::CanvasRenderingContext2d =
+    web_sys::window().unwrap().document().unwrap()
+        .get_element_by_id("canvas").unwrap()
+        .dyn_into::<web_sys::HtmlCanvasElement>().map_err(|_| ()).unwrap()
+        .get_context("2d") .unwrap() .unwrap()
+        .dyn_into::<web_sys::CanvasRenderingContext2d>() .unwrap()
+}
+
+fn get_context() -> web_sys::CanvasRenderingContext2d {
+    _context.with(|c| c.clone().clone())
 }
 
 async fn get_binary_file(path: &str) -> Result<Vec<u8>, JsValue> {
@@ -67,7 +106,6 @@ async fn get_binary_file(path: &str) -> Result<Vec<u8>, JsValue> {
     let buffer = JsFuture::from(resp.array_buffer()?).await?;
     Ok(Uint8Array::new(&buffer).to_vec())
 }
-
 
 // This is like the `main` function, except for JavaScript.
 #[wasm_bindgen(start)]
@@ -84,6 +122,8 @@ pub async fn main_js() {
         .expect(&format!("Can't load {}", path));
 
     chip8.load_rom(&buffer);
+    chip8.gfx.toggle(1, 1);
+    chip8.render();
 }
 
 #[cfg(test)]
