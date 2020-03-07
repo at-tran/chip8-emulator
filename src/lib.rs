@@ -1,15 +1,11 @@
-mod timer;
-mod graphics;
+mod chip8emulator;
 
+use chip8emulator::Chip8Emulator;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Response;
-use arrayvec::ArrayVec;
-use timer::Timer;
-use graphics::Graphics;
 use wasm_bindgen::JsCast;
 use js_sys::Uint8Array;
-
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
 // allocator.
@@ -20,84 +16,31 @@ use js_sys::Uint8Array;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 const ROMS_DIR: &str = "roms";
-const WIDTH: usize = 64;
-const HEIGHT: usize = 32;
 
-struct Chip8Emulator {
-    memory: [u8; 4096],
-    V: [u8; 16],
-    I: u16,
-    pc: u16,
-    gfx: Graphics,
-    delay_timer: Timer,
-    sound_timer: Timer,
-    stack: ArrayVec<[u16; 16]>,
-    keypad: [bool; 16],
-}
+fn render(chip8: &Chip8Emulator) {
+    let width = chip8.get_gfx_width();
+    let height = chip8.get_gfx_height();
 
-const PROGRAM_MEMORY_START: usize = 0x200;
+    let ctx = get_context();
+    let canvas = ctx.canvas().unwrap();
+    canvas.set_width(width as u32);
+    canvas.set_height(height as u32);
 
-impl Chip8Emulator {
-    fn new() -> Chip8Emulator {
-        Chip8Emulator {
-            memory: [0; 4096],
-            V: [0; 16],
-            I: 0,
-            pc: PROGRAM_MEMORY_START as u16,
-            gfx: Graphics::new(),
-            delay_timer: Timer::new(),
-            sound_timer: Timer::new(),
-            stack: ArrayVec::new(),
-            keypad: [false; 16],
-        }
-    }
+    ctx.begin_path();
 
-    fn load_rom(&mut self, rom_data: &[u8]) {
-        let end_index = PROGRAM_MEMORY_START + rom_data.len();
-        self.memory[PROGRAM_MEMORY_START..end_index].clone_from_slice(rom_data);
-    }
+    ctx.set_fill_style(&"#000000".into());
+    ctx.fill_rect(0.0, 0.0, width as f64, height as f64);
 
-    fn reset(&mut self) {
-        *self = Chip8Emulator::new();
-    }
-
-    fn render(&self) {
-        let ctx = get_context();
-
-        let canvas = ctx.canvas().unwrap();
-        canvas.set_width(WIDTH as u32);
-        canvas.set_height(HEIGHT as u32);
-
-        ctx.begin_path();
-
-        ctx.set_fill_style(&"#000000".into());
-        ctx.fill_rect(0.0, 0.0, WIDTH as f64, HEIGHT as f64);
-
-        ctx.set_fill_style(&"#00a86b".into());
-        for x in 0..WIDTH {
-            for y in 0..HEIGHT {
-                if self.gfx.get(x, y) {
-                    ctx.fill_rect(x as f64, y as f64, 1.0, 1.0);
-                }
+    ctx.set_fill_style(&"#00a86b".into());
+    for x in 0..width {
+        for y in 0..height {
+            if chip8.get_gfx_pixel(x, y) {
+                ctx.fill_rect(x as f64, y as f64, 1.0, 1.0);
             }
         }
-
-        ctx.stroke();
     }
-}
 
-thread_local! {
-static _context: web_sys::CanvasRenderingContext2d =
-    web_sys::window().unwrap().document().unwrap()
-        .get_element_by_id("canvas").expect("No element with id #canvas")
-        .dyn_into::<web_sys::HtmlCanvasElement>()
-        .expect("Element with id #canvas is not a canvas")
-        .get_context("2d").unwrap().unwrap()
-        .dyn_into::<web_sys::CanvasRenderingContext2d>().unwrap()
-}
-
-fn get_context() -> web_sys::CanvasRenderingContext2d {
-    _context.with(|c| c.clone())
+    ctx.stroke();
 }
 
 async fn get_binary_file(path: &str) -> Result<Vec<u8>, JsValue> {
@@ -117,14 +60,34 @@ pub async fn main_js() {
     #[cfg(debug_assertions)]
         console_error_panic_hook::set_once();
 
-    let mut chip8 = Chip8Emulator::new();
+    let mut chip8 = Chip8Emulator::new(get_current_time());
 
     let path = format!("{}/15PUZZLE", ROMS_DIR);
     let buffer = get_binary_file(&path).await.unwrap();
 
     chip8.load_rom(&buffer);
-    chip8.gfx.toggle(63, 31);
-    chip8.render();
+    render(&chip8);
+}
+
+thread_local! {
+    static performance: web_sys::Performance =
+        web_sys::window().unwrap().performance().unwrap();
+
+    static _context: web_sys::CanvasRenderingContext2d =
+        web_sys::window().unwrap().document().unwrap()
+            .get_element_by_id("canvas").expect("No element with id #canvas")
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .expect("Element with id #canvas is not a canvas")
+            .get_context("2d").unwrap().unwrap()
+            .dyn_into::<web_sys::CanvasRenderingContext2d>().unwrap()
+}
+
+fn get_current_time() -> f64 {
+    performance.with(|p| p.now())
+}
+
+fn get_context() -> web_sys::CanvasRenderingContext2d {
+    _context.with(|c| c.clone())
 }
 
 #[cfg(test)]
@@ -132,31 +95,4 @@ mod tests {
     use super::*;
     use wasm_bindgen_test::{wasm_bindgen_test_configure, wasm_bindgen_test};
     wasm_bindgen_test_configure!(run_in_browser);
-
-    #[wasm_bindgen_test]
-    fn test_load_rom() {
-        let mut chip8 = Chip8Emulator::new();
-        let data = [1u8, 5, 3, 5, 1, 255, 9];
-        chip8.load_rom(&data);
-
-        for i in 0..data.len() {
-            assert_eq!(chip8.memory[PROGRAM_MEMORY_START + i], data[i]);
-        }
-
-        for i in 0..5 {
-            assert_eq!(chip8.memory[PROGRAM_MEMORY_START - i - 1], 0);
-            assert_eq!(chip8.memory[PROGRAM_MEMORY_START + data.len() + i], 0);
-        }
-    }
-
-    #[wasm_bindgen_test]
-    fn test_reset() {
-        let mut chip8 = Chip8Emulator::new();
-        let data = [1u8, 5, 3, 5, 1, 255, 9];
-        chip8.load_rom(&data);
-        chip8.reset();
-        for i in 0..data.len() {
-            assert_eq!(chip8.memory[PROGRAM_MEMORY_START + i], 0);
-        }
-    }
 }
