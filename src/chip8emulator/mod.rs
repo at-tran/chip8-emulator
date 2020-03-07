@@ -92,4 +92,18 @@ mod tests {
             assert_eq!(chip8.memory[PROGRAM_MEMORY_START + i], 0);
         }
     }
+
+    #[test]
+    fn test_gfx() {
+        let mut chip8 = Chip8Emulator::new(0.0);
+
+        assert_eq!(chip8.get_gfx_width(), WIDTH);
+        assert_eq!(chip8.get_gfx_height(), HEIGHT);
+        assert!(chip8.gfx_needs_rerender());
+        assert!(!chip8.gfx_needs_rerender());
+        assert!(!chip8.get_gfx_pixel(5, 5));
+        chip8.gfx.toggle(5, 5);
+        assert!(chip8.get_gfx_pixel(5, 5));
+        assert!(chip8.gfx.toggle(5, 5));
+    }
 }

@@ -10,7 +10,7 @@ pub struct Graphics {
 impl Graphics {
     pub fn new(width: u32, height: u32) -> Graphics {
         let display = FixedBitSet::with_capacity((width * height) as usize);
-        Graphics { width, height, display, changed: false }
+        Graphics { width, height, display, changed: true }
     }
 
     /// Toggles the pixel at column `x` and row `y` (0-indexed) on the display
@@ -21,7 +21,7 @@ impl Graphics {
                 x, y, self.width, self.height);
 
         let index = y * self.width + x;
-        let res = self.display[index];
+        let res = self.display[index as usize];
         self.display.toggle(index as usize);
         self.changed = true;
         res
@@ -36,7 +36,7 @@ impl Graphics {
     }
 
     pub fn get_pixel(&self, x: u32, y: u32) -> bool {
-        self.display[y * self.width + x]
+        self.display[(y * self.width + x) as usize]
     }
 
     pub fn needs_rerender(&mut self) -> bool {
@@ -54,10 +54,16 @@ mod tests {
     fn test_graphics_toggle() {
         let mut gfx = Graphics::new(2, 2);
 
+        assert_eq!(gfx.get_width(), 2);
+        assert_eq!(gfx.get_height(), 2);
+
         gfx.display.insert(2);
         assert_eq!(gfx.toggle(0, 1), true);
+        assert!(gfx.needs_rerender());
+        assert!(!gfx.needs_rerender());
         assert_eq!(gfx.toggle(0, 1), false);
         assert!(gfx.display[2]);
+        assert!(gfx.needs_rerender());
         assert_eq!(gfx.toggle(0, 1), true);
         assert_eq!(gfx.toggle(1, 1), false);
         assert!(gfx.display[3]);

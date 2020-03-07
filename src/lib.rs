@@ -6,6 +6,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::Response;
 use wasm_bindgen::JsCast;
 use js_sys::Uint8Array;
+use gloo::{events::EventListener};
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
 // allocator.
@@ -28,6 +29,7 @@ pub async fn main_js() {
         console_error_panic_hook::set_once();
 
     let mut chip8 = Chip8Emulator::new(get_current_time());
+
     set_canvas_size(chip8.get_gfx_width(), chip8.get_gfx_height());
 
     let rom_name = "15PUZZLE";
@@ -35,9 +37,14 @@ pub async fn main_js() {
 
     let buffer = get_binary_file(&path).await
         .expect(&format!("Can't load {}", path));
+
     chip8.load_rom(&buffer);
 
-    render(&chip8);
+    register_inputs(&chip8);
+
+    if chip8.gfx_needs_rerender() {
+        render(&chip8);
+    }
 }
 
 fn set_canvas_size(width: u32, height: u32) {
@@ -81,8 +88,11 @@ async fn get_binary_file(path: &str) -> Result<Vec<u8>, JsValue> {
     Ok(Uint8Array::new(&buffer).to_vec())
 }
 
-fn register_inputs() {
-
+fn register_inputs(chip8: &Chip8Emulator) {
+    EventListener::new(&web_sys::window().unwrap(), "keydown", |e| {
+        let e: web_sys::KeyboardEvent = e.clone().dyn_into().unwrap();
+        web_sys::console::log_1(&e.key().into());
+    }).forget();
 }
 
 thread_local! {
