@@ -65,8 +65,8 @@ impl Chip8Emulator {
         let ctx = get_context();
 
         let canvas = ctx.canvas().unwrap();
-        canvas.set_width(64);
-        canvas.set_height(32);
+        canvas.set_width(WIDTH as u32);
+        canvas.set_height(HEIGHT as u32);
 
         ctx.begin_path();
 
@@ -89,20 +89,22 @@ impl Chip8Emulator {
 thread_local! {
 static _context: web_sys::CanvasRenderingContext2d =
     web_sys::window().unwrap().document().unwrap()
-        .get_element_by_id("canvas").unwrap()
-        .dyn_into::<web_sys::HtmlCanvasElement>().map_err(|_| ()).unwrap()
-        .get_context("2d") .unwrap() .unwrap()
-        .dyn_into::<web_sys::CanvasRenderingContext2d>() .unwrap()
+        .get_element_by_id("canvas").expect("No element with id #canvas")
+        .dyn_into::<web_sys::HtmlCanvasElement>()
+        .expect("Element with id #canvas is not a canvas")
+        .get_context("2d").unwrap().unwrap()
+        .dyn_into::<web_sys::CanvasRenderingContext2d>().unwrap()
 }
 
 fn get_context() -> web_sys::CanvasRenderingContext2d {
-    _context.with(|c| c.clone().clone())
+    _context.with(|c| c.clone())
 }
 
 async fn get_binary_file(path: &str) -> Result<Vec<u8>, JsValue> {
     let window = web_sys::window().unwrap();
     let resp_value = JsFuture::from(window.fetch_with_str(path)).await?;
     let resp: Response = resp_value.dyn_into().unwrap();
+    assert!(resp.ok(), "Can't load {}", path);
     let buffer = JsFuture::from(resp.array_buffer()?).await?;
     Ok(Uint8Array::new(&buffer).to_vec())
 }
@@ -118,11 +120,10 @@ pub async fn main_js() {
     let mut chip8 = Chip8Emulator::new();
 
     let path = format!("{}/15PUZZLE", ROMS_DIR);
-    let buffer = get_binary_file(&path).await
-        .expect(&format!("Can't load {}", path));
+    let buffer = get_binary_file(&path).await.unwrap();
 
     chip8.load_rom(&buffer);
-    chip8.gfx.toggle(1, 1);
+    chip8.gfx.toggle(63, 31);
     chip8.render();
 }
 

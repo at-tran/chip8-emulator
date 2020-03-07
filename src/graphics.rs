@@ -17,10 +17,10 @@ impl Graphics {
     /// Toggles the pixel at column `x` and row `y` (0-indexed) on the display
     /// and returns whether a pixel was toggled from on to off.
     pub fn toggle(&mut self, x: usize, y: usize) -> bool {
-        if x >= self.width || y >= self.height {
-            panic!("Pixel ({}, {}) is out of bounds of display size {}x{}",
-                   x, y, self.width, self.height);
-        }
+        assert!(x < self.width && y < self.height,
+                "Pixel ({}, {}) is out of bounds of display size {}x{}",
+                x, y, self.width, self.height);
+
         let index = y * self.width + x;
         let res = self.display[index];
         self.display.toggle(index);
