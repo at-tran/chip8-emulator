@@ -39,14 +39,29 @@ impl Chip8Emulator {
             sound_timer: Chip8Timer::new(current_time),
             stack: ArrayVec::new(),
             keypad: KeyPad::new(),
-            timer: Timer::new(current_time, 1000.0 / 800.0),
+            timer: Timer::new(current_time, 1000.0 / 600.0),
         }
     }
 
     pub fn tick(&mut self, current_time: f64) {
         for _ in 0..self.timer.step(current_time) as u32 {
-            self.gfx.toggle(current_time as u32 % self.gfx.get_width(),
-                            current_time as u32 % self.gfx.get_height());
+            let opcode = self.get_next_opcode();
+            // web_sys::console::log_1(&format!("{:X}", opcode).into());
+            match get_nibbles(opcode, 0, 1) {
+                0 => match get_nibbles(opcode, 1, 4) {
+                    0x0e0 => self.clear_screen(),
+                    0x0ee => self.return_subroutine(),
+                    address => self.execute_subroutine(address)
+                }
+                1 => self.jump_to(get_nibbles(opcode, 1, 4)),
+                2 => self.execute_subroutine(get_nibbles(opcode, 1, 4)),
+                3 => self.skip_if_eq(get_nibbles(opcode, 1, 2) as u8,
+                                     get_nibbles(opcode, 2, 4) as u8),
+                4 => self.skip_if_ne(get_nibbles(opcode, 1, 2) as u8,
+                                     get_nibbles(opcode, 2, 4) as u8),
+
+                _ => web_sys::console::error_1(&format!("Invalid instruction {:X}", opcode).into())
+            }
         }
     }
 
@@ -86,6 +101,54 @@ impl Chip8Emulator {
     pub fn set_ticks_per_second(&mut self, ticks_per_second: f64) {
         self.timer.set_interval(1000.0 / ticks_per_second);
     }
+
+    fn get_next_opcode(&mut self) -> u16 {
+        let opcode = ((self.memory[self.pc as usize] as u16) << 8)
+            + self.memory[self.pc as usize + 1] as u16;
+        self.pc += 2;
+        opcode
+    }
+
+    fn clear_screen(&mut self) {
+        self.gfx.clear();
+    }
+
+    fn return_subroutine(&mut self) {
+        self.pc = self.stack.pop().expect("Cannot pop empty stack");
+    }
+
+    fn execute_subroutine(&mut self, address: u16) {
+        self.stack.push(self.pc);
+        self.jump_to(address);
+    }
+
+    fn jump_to(&mut self, address: u16) {
+        self.pc = address;
+    }
+
+    fn skip_if_eq(&mut self, v: u8, value: u8) {
+        if self.V[v as usize] == value {
+            self.pc += 2;
+        }
+    }
+
+    fn skip_if_ne(&mut self, v: u8, value: u8) {
+        if self.V[v as usize] != value {
+            self.pc += 2;
+        }
+    }
+}
+
+fn get_nibbles(value: u16, start_index: u16, end_index: u16) -> u16 {
+    assert!(0 <= start_index);
+    assert!(start_index < end_index);
+    assert!(end_index <= 4);
+
+    let mut mask = 0;
+    for i in start_index..end_index {
+        mask += 0xf << (4 - i);
+    };
+    (value & mask) >> (4 - end_index)
 }
 
 
@@ -132,5 +195,13 @@ mod tests {
         chip8.gfx.toggle(5, 5);
         assert!(chip8.get_gfx_pixel(5, 5));
         assert!(chip8.gfx.toggle(5, 5));
+    }
+
+    #[test]
+    fn test_get_nibbles() {
+        assert_eq!(get_nibbles(0x3a7b, 1, 3), 0xa7);
+        assert_eq!(get_nibbles(0x3a7b, 2, 3), 0x7);
+        assert_eq!(get_nibbles(0x3a7b, 2, 4), 0x7b);
+        assert_eq!(get_nibbles(0x3a7b, 0, 4), 0x3a7b);
     }
 }

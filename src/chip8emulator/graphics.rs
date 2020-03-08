@@ -44,6 +44,11 @@ impl Graphics {
         self.changed = false;
         res
     }
+
+    pub fn clear(&mut self) {
+        self.display.clear();
+        self.changed = true;
+    }
 }
 
 #[cfg(test)]
@@ -71,5 +76,10 @@ mod tests {
         assert_eq!(gfx.toggle(1, 1), true);
         assert!(gfx.get_pixel(0, 0) && !gfx.get_pixel(0, 1) &&
             !gfx.get_pixel(1, 0) && !gfx.get_pixel(1, 1));
+
+        gfx.clear();
+        assert!(!gfx.get_pixel(0, 0) && !gfx.get_pixel(0, 1) &&
+            !gfx.get_pixel(1, 0) && !gfx.get_pixel(1, 1));
+
     }
 }
