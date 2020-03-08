@@ -11,6 +11,7 @@ const WIDTH: u32 = 64;
 const HEIGHT: u32 = 32;
 const PROGRAM_MEMORY_START: usize = 0x200;
 
+#[allow(non_snake_case)]
 pub struct Chip8Emulator {
     memory: [u8; 4096],
     V: [u8; 16],
