@@ -98,10 +98,10 @@ impl Chip8Emulator {
             }
             1 => self.jump_to(get_nibbles(opcode, 1, 4)),
             2 => self.execute_subroutine(get_nibbles(opcode, 1, 4)),
-            3 => self.skip_if_eq_val(get_nibble(opcode, 1),
-                                     get_nibbles(opcode, 2, 4) as u8),
-            4 => self.skip_if_ne_val(get_nibble(opcode, 1),
-                                     get_nibbles(opcode, 2, 4) as u8),
+            3 => self.skip_if_eq(get_nibble(opcode, 1),
+                                 get_nibbles(opcode, 2, 4) as u8),
+            4 => self.skip_if_ne(get_nibble(opcode, 1),
+                                 get_nibbles(opcode, 2, 4) as u8),
             5 => match get_nibble(opcode, 3) {
                 0 => self.skip_if_eq_reg(get_nibble(opcode, 1),
                                          get_nibble(opcode, 2)),
@@ -110,7 +110,11 @@ impl Chip8Emulator {
             6 => self.store(get_nibble(opcode, 1),
                             get_nibbles(opcode, 2, 4) as u8),
             7 => self.add(get_nibble(opcode, 1),
-                            get_nibbles(opcode, 2, 4) as u8),
+                          get_nibbles(opcode, 2, 4) as u8),
+            8 => match get_nibble(opcode, 3) {
+                0 => self.store_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                _ => Chip8Emulator::invalid_instruction(opcode)
+            }
 
             _ => Chip8Emulator::invalid_instruction(opcode)
         }
@@ -140,30 +144,34 @@ impl Chip8Emulator {
         self.pc = address;
     }
 
-    fn skip_if_eq_val(&mut self, v: u8, value: u8) {
-        if self.V[v as usize] == value {
+    fn skip_if_eq(&mut self, x: u8, value: u8) {
+        if self.V[x as usize] == value {
             self.pc += 2;
         }
     }
 
-    fn skip_if_ne_val(&mut self, v: u8, value: u8) {
-        if self.V[v as usize] != value {
+    fn skip_if_ne(&mut self, x: u8, value: u8) {
+        if self.V[x as usize] != value {
             self.pc += 2;
         }
     }
 
-    fn skip_if_eq_reg(&mut self, v: u8, other: u8) {
-        if self.V[v as usize] == self.V[other as usize] {
+    fn skip_if_eq_reg(&mut self, x: u8, y: u8) {
+        if self.V[x as usize] == self.V[y as usize] {
             self.pc += 2;
         }
     }
 
-    fn store(&mut self, v: u8, val: u8) {
-        self.V[v as usize] = val;
+    fn store(&mut self, x: u8, val: u8) {
+        self.V[x as usize] = val;
     }
 
-    fn add(&mut self, v: u8, val: u8) {
-        self.V[v as usize] += val;
+    fn add(&mut self, x: u8, y: u8) {
+        self.V[x as usize] += y;
+    }
+
+    fn store_reg(&mut self, x: u8, y: u8) {
+        self.V[x as usize] = self.V[y as usize]
     }
 
     fn invalid_instruction(opcode: u16) {
@@ -182,9 +190,9 @@ fn get_nibbles(value: u16, start_index: u16, end_index: u16) -> u16 {
 
     let mut mask = 0;
     for i in start_index..end_index {
-        mask += 0xf << (4 - i);
+        mask += 0xf << (3 - i) * 4;
     };
-    (value & mask) >> (4 - end_index)
+    (value & mask) >> (4 - end_index) * 4
 }
 
 
@@ -239,5 +247,7 @@ mod tests {
         assert_eq!(get_nibbles(0x3a7b, 2, 3), 0x7);
         assert_eq!(get_nibbles(0x3a7b, 2, 4), 0x7b);
         assert_eq!(get_nibbles(0x3a7b, 0, 4), 0x3a7b);
+        assert_eq!(get_nibble(0x3a7b, 0), 0x3);
+        assert_eq!(get_nibble(0x3a7b, 3), 0xb);
     }
 }
