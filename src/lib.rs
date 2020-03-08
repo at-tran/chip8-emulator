@@ -45,12 +45,14 @@ pub async fn main_js() {
 
     register_inputs(&chip8);
 
-    if chip8.borrow_mut().gfx_needs_rerender() {
-        render(&chip8);
-    }
-
     Interval::new(1, move || {
-        chip8.borrow_mut().tick(get_current_time());
+        let mut chip8 = chip8.borrow_mut();
+
+        chip8.tick(get_current_time());
+
+        if chip8.gfx_needs_rerender() {
+            render(&chip8);
+        }
     }).forget();
 }
 
@@ -60,8 +62,7 @@ fn set_canvas_size(width: u32, height: u32) {
     canvas.set_height(height);
 }
 
-fn render(chip8: &Rc<RefCell<chip8emulator::Chip8Emulator>>) {
-    let chip8 = chip8.borrow_mut();
+fn render(chip8: &Chip8Emulator) {
     let width = chip8.get_gfx_width();
     let height = chip8.get_gfx_height();
 
@@ -96,22 +97,25 @@ async fn get_binary_file(path: &str) -> Result<Vec<u8>, JsValue> {
     Ok(Uint8Array::new(&buffer).to_vec())
 }
 
-fn register_inputs(chip8: &Rc<RefCell<chip8emulator::Chip8Emulator>>) {
-    let chip8_tmp = Rc::clone(&chip8);
-    EventListener::new(&web_sys::window().unwrap(), "keydown", move |e| {
-        let e: web_sys::KeyboardEvent = e.clone().dyn_into().unwrap();
-        if let Some(key) = jskey_to_chip8key(&e.key()) {
-            web_sys::console::log_1(&format!("Key down: {:X}", key).into());
-            chip8_tmp.borrow_mut().keydown(key);
-        }
-    }).forget();
+fn register_inputs(chip8: &Rc<RefCell<Chip8Emulator>>) {
+    add_input_event(chip8, "keydown", |chip8, key| {
+        chip8.borrow_mut().keydown(key);
+    });
 
-    let chip8_tmp = Rc::clone(&chip8);
-    EventListener::new(&web_sys::window().unwrap(), "keyup", move |e| {
+    add_input_event(chip8, "keyup", |chip8, key| {
+        chip8.borrow_mut().keyup(key);
+    });
+}
+
+fn add_input_event<F>(chip8: &Rc<RefCell<Chip8Emulator>>, event: &'static str, f: F)
+    where F: Fn(&Rc<RefCell<Chip8Emulator>>, u8) + 'static {
+
+    let chip8 = Rc::clone(&chip8);
+
+    EventListener::new(&web_sys::window().unwrap(), event, move |e| {
         let e: web_sys::KeyboardEvent = e.clone().dyn_into().unwrap();
         if let Some(key) = jskey_to_chip8key(&e.key()) {
-            web_sys::console::log_1(&format!("Key up: {:X}", key).into());
-            chip8_tmp.borrow_mut().keyup(key);
+            f(&chip8, key);
         }
     }).forget();
 }

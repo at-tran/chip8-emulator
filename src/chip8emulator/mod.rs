@@ -45,7 +45,8 @@ impl Chip8Emulator {
 
     pub fn tick(&mut self, current_time: f64) {
         for _ in 0..self.timer.step(current_time) as u32 {
-            web_sys::console::log_1(&current_time.into());
+            self.gfx.toggle(current_time as u32 % self.gfx.get_width(),
+                            current_time as u32 % self.gfx.get_height());
         }
     }
 
