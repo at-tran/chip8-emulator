@@ -1,27 +1,27 @@
-## How to install
+## Installing dependencies
 
 ```sh
 npm install
 ```
 
-## How to run in debug mode
+## Running in debug mode
 
 ```sh
 # Builds the project and opens it in a new browser tab. Auto-reloads when the project changes.
 npm start
 ```
 
-## How to build in release mode
+## Building in release mode
 
 ```sh
 # Builds the project and places it into the `dist` folder.
 npm run build
 ```
 
-## How to run unit tests
+## Running unit tests
 
 ```sh
-# Runs tests in Chrome
+# Runs tests with Cargo and wasm_bindgen tests in Chrome
 npm test
 ```
 

@@ -45,23 +45,7 @@ impl Chip8Emulator {
 
     pub fn tick(&mut self, current_time: f64) {
         for _ in 0..self.timer.step(current_time) as u32 {
-            let opcode = self.get_next_opcode();
-            // web_sys::console::log_1(&format!("{:X}", opcode).into());
-            match get_nibbles(opcode, 0, 1) {
-                0 => match get_nibbles(opcode, 1, 4) {
-                    0x0e0 => self.clear_screen(),
-                    0x0ee => self.return_subroutine(),
-                    address => self.execute_subroutine(address)
-                }
-                1 => self.jump_to(get_nibbles(opcode, 1, 4)),
-                2 => self.execute_subroutine(get_nibbles(opcode, 1, 4)),
-                3 => self.skip_if_eq(get_nibbles(opcode, 1, 2) as u8,
-                                     get_nibbles(opcode, 2, 4) as u8),
-                4 => self.skip_if_ne(get_nibbles(opcode, 1, 2) as u8,
-                                     get_nibbles(opcode, 2, 4) as u8),
-
-                _ => web_sys::console::error_1(&format!("Invalid instruction {:X}", opcode).into())
-            }
+            self.execute_next_instruction();
         }
     }
 
@@ -102,6 +86,36 @@ impl Chip8Emulator {
         self.timer.set_interval(1000.0 / ticks_per_second);
     }
 
+    fn execute_next_instruction(&mut self) {
+        let opcode = self.get_next_opcode();
+        // web_sys::console::log_1(&format!("{:X}", opcode).into());
+
+        match get_nibble(opcode, 0) {
+            0 => match get_nibbles(opcode, 1, 4) {
+                0x0e0 => self.clear_screen(),
+                0x0ee => self.return_subroutine(),
+                address => self.execute_subroutine(address)
+            }
+            1 => self.jump_to(get_nibbles(opcode, 1, 4)),
+            2 => self.execute_subroutine(get_nibbles(opcode, 1, 4)),
+            3 => self.skip_if_eq_val(get_nibble(opcode, 1),
+                                     get_nibbles(opcode, 2, 4) as u8),
+            4 => self.skip_if_ne_val(get_nibble(opcode, 1),
+                                     get_nibbles(opcode, 2, 4) as u8),
+            5 => match get_nibble(opcode, 3) {
+                0 => self.skip_if_eq_reg(get_nibble(opcode, 1),
+                                         get_nibble(opcode, 2)),
+                _ => Chip8Emulator::invalid_instruction(opcode)
+            }
+            6 => self.store(get_nibble(opcode, 1),
+                            get_nibbles(opcode, 2, 4) as u8),
+            7 => self.add(get_nibble(opcode, 1),
+                            get_nibbles(opcode, 2, 4) as u8),
+
+            _ => Chip8Emulator::invalid_instruction(opcode)
+        }
+    }
+
     fn get_next_opcode(&mut self) -> u16 {
         let opcode = ((self.memory[self.pc as usize] as u16) << 8)
             + self.memory[self.pc as usize + 1] as u16;
@@ -126,17 +140,39 @@ impl Chip8Emulator {
         self.pc = address;
     }
 
-    fn skip_if_eq(&mut self, v: u8, value: u8) {
+    fn skip_if_eq_val(&mut self, v: u8, value: u8) {
         if self.V[v as usize] == value {
             self.pc += 2;
         }
     }
 
-    fn skip_if_ne(&mut self, v: u8, value: u8) {
+    fn skip_if_ne_val(&mut self, v: u8, value: u8) {
         if self.V[v as usize] != value {
             self.pc += 2;
         }
     }
+
+    fn skip_if_eq_reg(&mut self, v: u8, other: u8) {
+        if self.V[v as usize] == self.V[other as usize] {
+            self.pc += 2;
+        }
+    }
+
+    fn store(&mut self, v: u8, val: u8) {
+        self.V[v as usize] = val;
+    }
+
+    fn add(&mut self, v: u8, val: u8) {
+        self.V[v as usize] += val;
+    }
+
+    fn invalid_instruction(opcode: u16) {
+        web_sys::console::error_1(&format!("Invalid instruction {:X}", opcode).into())
+    }
+}
+
+fn get_nibble(value: u16, index: u16) -> u8 {
+    get_nibbles(value, index, index + 1) as u8
 }
 
 fn get_nibbles(value: u16, start_index: u16, end_index: u16) -> u16 {
