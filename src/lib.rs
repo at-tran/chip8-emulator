@@ -6,7 +6,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::Response;
 use wasm_bindgen::JsCast;
 use js_sys::Uint8Array;
-use gloo::{events::EventListener};
+use gloo::{events::EventListener, timers::callback::Interval};
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -35,7 +35,7 @@ pub async fn main_js() {
 
     set_canvas_size(chip8.borrow().get_gfx_width(), chip8.borrow().get_gfx_height());
 
-    let rom_name = "15PUZZLE";
+    let rom_name = "PONG";
     let path = format!("{}/{}", ROMS_DIR, rom_name);
 
     let buffer = get_binary_file(&path).await
@@ -48,6 +48,10 @@ pub async fn main_js() {
     if chip8.borrow_mut().gfx_needs_rerender() {
         render(&chip8);
     }
+
+    Interval::new(1, move || {
+        chip8.borrow_mut().tick(get_current_time());
+    }).forget();
 }
 
 fn set_canvas_size(width: u32, height: u32) {

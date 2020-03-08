@@ -1,10 +1,12 @@
 mod timer;
 mod graphics;
 mod keypad;
+mod chip8timer;
 
 use timer::Timer;
 use graphics::Graphics;
 use keypad::KeyPad;
+use chip8timer::Chip8Timer;
 use arrayvec::ArrayVec;
 
 const WIDTH: u32 = 64;
@@ -18,10 +20,11 @@ pub struct Chip8Emulator {
     I: u16,
     pc: u16,
     gfx: Graphics,
-    delay_timer: Timer,
-    sound_timer: Timer,
+    delay_timer: Chip8Timer,
+    sound_timer: Chip8Timer,
     stack: ArrayVec<[u16; 16]>,
     keypad: KeyPad,
+    timer: Timer,
 }
 
 impl Chip8Emulator {
@@ -32,10 +35,17 @@ impl Chip8Emulator {
             I: 0,
             pc: PROGRAM_MEMORY_START as u16,
             gfx: Graphics::new(WIDTH, HEIGHT),
-            delay_timer: Timer::new(current_time),
-            sound_timer: Timer::new(current_time),
+            delay_timer: Chip8Timer::new(current_time),
+            sound_timer: Chip8Timer::new(current_time),
             stack: ArrayVec::new(),
             keypad: KeyPad::new(),
+            timer: Timer::new(current_time, 1000.0 / 800.0),
+        }
+    }
+
+    pub fn tick(&mut self, current_time: f64) {
+        for _ in 0..self.timer.step(current_time) as u32 {
+            web_sys::console::log_1(&current_time.into());
         }
     }
 
@@ -70,6 +80,10 @@ impl Chip8Emulator {
 
     pub fn keyup(&mut self, key: u8) {
         self.keypad.keyup(key);
+    }
+
+    pub fn set_ticks_per_second(&mut self, ticks_per_second: f64) {
+        self.timer.set_interval(1000.0 / ticks_per_second);
     }
 }
 
