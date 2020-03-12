@@ -1,13 +1,13 @@
-mod timer;
+mod chip8timer;
 mod graphics;
 mod keypad;
-mod chip8timer;
+mod timer;
 
-use timer::Timer;
+use arrayvec::ArrayVec;
+use chip8timer::Chip8Timer;
 use graphics::Graphics;
 use keypad::KeyPad;
-use chip8timer::Chip8Timer;
-use arrayvec::ArrayVec;
+use timer::Timer;
 
 const WIDTH: u32 = 64;
 const HEIGHT: u32 = 32;
@@ -94,29 +94,32 @@ impl Chip8Emulator {
             0 => match get_nibbles(opcode, 1, 4) {
                 0x0e0 => self.clear_screen(),
                 0x0ee => self.return_subroutine(),
-                address => self.execute_subroutine(address)
-            }
+                address => self.execute_subroutine(address),
+            },
             1 => self.jump_to(get_nibbles(opcode, 1, 4)),
             2 => self.execute_subroutine(get_nibbles(opcode, 1, 4)),
-            3 => self.skip_if_eq(get_nibble(opcode, 1),
-                                 get_nibbles(opcode, 2, 4) as u8),
-            4 => self.skip_if_ne(get_nibble(opcode, 1),
-                                 get_nibbles(opcode, 2, 4) as u8),
+            3 => self.skip_if_eq(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
+            4 => self.skip_if_ne(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
             5 => match get_nibble(opcode, 3) {
-                0 => self.skip_if_eq_reg(get_nibble(opcode, 1),
-                                         get_nibble(opcode, 2)),
-                _ => Chip8Emulator::invalid_instruction(opcode)
-            }
-            6 => self.store(get_nibble(opcode, 1),
-                            get_nibbles(opcode, 2, 4) as u8),
-            7 => self.add(get_nibble(opcode, 1),
-                          get_nibbles(opcode, 2, 4) as u8),
+                0 => self.skip_if_eq_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                _ => Chip8Emulator::invalid_instruction(opcode),
+            },
+            6 => self.store(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
+            7 => self.add(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
             8 => match get_nibble(opcode, 3) {
                 0 => self.store_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
-                _ => Chip8Emulator::invalid_instruction(opcode)
-            }
+                1 => self.store_reg_or(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                2 => self.store_reg_and(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                3 => self.store_reg_xor(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                4 => self.add_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                5 => self.sub_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                6 => self.store_reg_shr1(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                7 => self.store_reg_sub(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                0xe => self.store_reg_shl1(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                _ => Chip8Emulator::invalid_instruction(opcode),
+            },
 
-            _ => Chip8Emulator::invalid_instruction(opcode)
+            _ => Chip8Emulator::invalid_instruction(opcode),
         }
     }
 
@@ -174,6 +177,46 @@ impl Chip8Emulator {
         self.V[x as usize] = self.V[y as usize]
     }
 
+    fn store_reg_or(&mut self, x: u8, y: u8) {
+        self.V[x as usize] = self.V[x as usize] | self.V[y as usize]
+    }
+
+    fn store_reg_and(&mut self, x: u8, y: u8) {
+        self.V[x as usize] = self.V[x as usize] & self.V[y as usize]
+    }
+
+    fn store_reg_xor(&mut self, x: u8, y: u8) {
+        self.V[x as usize] = self.V[x as usize] ^ self.V[y as usize]
+    }
+
+    fn add_reg(&mut self, x: u8, y: u8) {
+        let (new_val, carry) = self.V[x as usize].overflowing_add(self.V[y as usize]);
+        self.V[x as usize] = new_val;
+        self.V[0xf] = carry as u8;
+    }
+
+    fn sub_reg(&mut self, x: u8, y: u8) {
+        let (new_val, borrow) = self.V[x as usize].overflowing_sub(self.V[y as usize]);
+        self.V[x as usize] = new_val;
+        self.V[0xf] = (!borrow) as u8;
+    }
+
+    fn store_reg_shr1(&mut self, x: u8, y: u8) {
+        self.V[0xf] = self.V[y as usize] & 0x1;
+        self.V[x as usize] = self.V[y as usize] >> 1;
+    }
+
+    fn store_reg_sub(&mut self, x: u8, y: u8) {
+        let (new_val, borrow) = self.V[y as usize].overflowing_sub(self.V[x as usize]);
+        self.V[x as usize] = new_val;
+        self.V[0xf] = (!borrow) as u8;
+    }
+
+    fn store_reg_shl1(&mut self, x: u8, y: u8) {
+        self.V[0xf] = (self.V[y as usize] >> 7) & 0x1;
+        self.V[x as usize] = self.V[y as usize] << 1;
+    }
+
     fn invalid_instruction(opcode: u16) {
         web_sys::console::error_1(&format!("Invalid instruction {:X}", opcode).into())
     }
@@ -184,17 +227,15 @@ fn get_nibble(value: u16, index: u16) -> u8 {
 }
 
 fn get_nibbles(value: u16, start_index: u16, end_index: u16) -> u16 {
-    assert!(0 <= start_index);
     assert!(start_index < end_index);
     assert!(end_index <= 4);
 
     let mut mask = 0;
     for i in start_index..end_index {
         mask += 0xf << (3 - i) * 4;
-    };
+    }
     (value & mask) >> (4 - end_index) * 4
 }
-
 
 #[cfg(test)]
 mod tests {
