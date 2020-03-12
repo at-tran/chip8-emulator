@@ -291,4 +291,117 @@ mod tests {
         assert_eq!(get_nibble(0x3a7b, 0), 0x3);
         assert_eq!(get_nibble(0x3a7b, 3), 0xb);
     }
+
+    #[test]
+    fn test_get_next_opcode() {
+        let mut chip8 = Chip8Emulator::new(0.0);
+        let data = [
+            0xf1, 0x7d, 0x05, 0x00, 0x13, 0x5c, 0x1a, 0xc4, 0x58, 0xdf, 0x00, 0x01, 0x00, 0x00,
+            0x1a, 0x43,
+        ];
+
+        let opcodes = [
+            0xf17du16, 0x0500, 0x135c, 0x1ac4, 0x58df, 0x0001, 0x0000, 0x1a43,
+        ];
+
+        chip8.load_rom(&data);
+        for opcode in opcodes.iter() {
+            assert_eq!(chip8.get_next_opcode(), *opcode)
+        }
+    }
+
+    #[test]
+    fn test_subroutine() {
+        let mut chip8 = Chip8Emulator::new(0.0);
+        chip8.jump_to(0xaaaa);
+        chip8.execute_subroutine(0x1111);
+        assert_eq!(chip8.stack[0], 0xaaaa);
+        chip8.return_subroutine();
+        assert_eq!(chip8.pc, 0xaaaa);
+        assert!(chip8.stack.is_empty())
+    }
+
+    #[test]
+    fn test_skip() {
+        let mut chip8 = Chip8Emulator::new(0.0);
+        chip8.jump_to(0);
+        chip8.store(0, 5);
+        chip8.skip_if_eq(0, 4);
+        assert_eq!(chip8.pc, 0);
+        chip8.skip_if_eq(0, 5);
+        assert_eq!(chip8.pc, 2);
+        chip8.skip_if_ne(0, 5);
+        assert_eq!(chip8.pc, 2);
+        chip8.skip_if_ne(0, 4);
+        assert_eq!(chip8.pc, 4);
+        chip8.store(1, 5);
+        chip8.store(2, 6);
+        chip8.skip_if_eq_reg(0, 2);
+        assert_eq!(chip8.pc, 4);
+        chip8.skip_if_eq_reg(0, 1);
+        assert_eq!(chip8.pc, 6);
+    }
+
+    #[test]
+    fn test_arithmetic() {
+        let mut chip8 = Chip8Emulator::new(0.0);
+
+        let x = 0;
+        let y = 1;
+
+        chip8.store(x, 10);
+        assert_eq!(chip8.V[0], 10);
+        chip8.add(x, 5);
+        assert_eq!(chip8.V[0], 15);
+        chip8.add(x, get_nibbles(0x7005, 2, 4) as u8);
+        assert_eq!(chip8.V[0], 20);
+        chip8.store(y, 25);
+        chip8.store_reg(x, y);
+        assert_eq!(chip8.V[x as usize], 25);
+        chip8.store_reg(3, x);
+        assert_eq!(chip8.V[3], 25);
+
+        chip8.store(x, 10);
+        chip8.store_reg_or(x, y);
+        assert_eq!(chip8.V[x as usize], 10 | 25);
+
+        chip8.store(x, 10);
+        chip8.store_reg_and(x, y);
+        assert_eq!(chip8.V[x as usize], 10 & 25);
+
+        chip8.store(x, 10);
+        chip8.store_reg_xor(x, y);
+        assert_eq!(chip8.V[x as usize], 10 ^ 25);
+
+        chip8.store(x, 254);
+        chip8.store(y, 3);
+        chip8.add_reg(x, y);
+        assert_eq!(chip8.V[x as usize], 1);
+        assert_eq!(chip8.V[0xf], 1);
+        chip8.add_reg(x, y);
+        assert_eq!(chip8.V[x as usize], 4);
+        assert_eq!(chip8.V[0xf], 0);
+        chip8.sub_reg(x, y);
+        assert_eq!(chip8.V[x as usize], 1);
+        assert_eq!(chip8.V[0xf], 1);
+        chip8.sub_reg(x, y);
+        assert_eq!(chip8.V[x as usize], 254);
+        assert_eq!(chip8.V[0xf], 0);
+
+        chip8.store(y, 0b10);
+        chip8.store_reg_shr1(x, y);
+        assert_eq!(chip8.V[x as usize], 1);
+        assert_eq!(chip8.V[0xf], 0);
+
+        chip8.store(x, 10);
+        chip8.store(y, 5);
+        chip8.store_reg_sub(x, y);
+        assert_eq!(chip8.V[x as usize], 251);
+        assert_eq!(chip8.V[0xf], 0);
+
+        chip8.store(y, 0x80);
+        chip8.store_reg_shl1(x, y);
+        assert_eq!(chip8.V[x as usize], 0);
+        assert_eq!(chip8.V[0xf], 1);
+    }
 }
