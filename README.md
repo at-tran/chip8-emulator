@@ -1,3 +1,5 @@
+![Rust](https://github.com/at-tran/chip8-emulator/workflows/Rust/badge.svg)
+
 ## Installing dependencies
 
 ```sh

@@ -7,13 +7,13 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
-    - name: Install
+    - name: Install dependencies
       run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh && npm install
     - name: Run tests
       run: npm test

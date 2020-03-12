@@ -3,10 +3,11 @@
 name = "chip8-emulator"
 description = "My super awesome Rust, WebAssembly, and Webpack project!"
 version = "0.1.0"
-authors = ["You <you@example.com>"]
+authors = ["Anh Tuan Tran <nhanhnhanh17399@gmail.com>"]
 categories = ["wasm"]
 readme = "README.md"
 edition = "2018"
+license = "MIT OR Apache-2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
