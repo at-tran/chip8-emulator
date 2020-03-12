@@ -14,8 +14,7 @@ impl Chip8Timer {
     }
 
     pub fn step(&mut self, current_time: f64) {
-        let ticks = self.timer.step(current_time)
-            .min(std::u8::MAX as u32);
+        let ticks = self.timer.step(current_time).min(std::u8::MAX as u32);
         self.value = self.value.saturating_sub(ticks as u8);
     }
 

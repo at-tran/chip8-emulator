@@ -10,15 +10,25 @@ pub struct Graphics {
 impl Graphics {
     pub fn new(width: u32, height: u32) -> Graphics {
         let display = FixedBitSet::with_capacity((width * height) as usize);
-        Graphics { width, height, display, changed: true }
+        Graphics {
+            width,
+            height,
+            display,
+            changed: true,
+        }
     }
 
     /// Toggles the pixel at column `x` and row `y` (0-indexed) on the display
     /// and returns whether a pixel was toggled from on to off.
     pub fn toggle(&mut self, x: u32, y: u32) -> bool {
-        assert!(x < self.width && y < self.height,
-                "Pixel ({}, {}) is out of bounds of display size {}x{}",
-                x, y, self.width, self.height);
+        assert!(
+            x < self.width && y < self.height,
+            "Pixel ({}, {}) is out of bounds of display size {}x{}",
+            x,
+            y,
+            self.width,
+            self.height
+        );
 
         let index = y * self.width + x;
         let res = self.display[index as usize];
@@ -74,12 +84,19 @@ mod tests {
         assert!(gfx.display[3]);
         assert_eq!(gfx.toggle(0, 0), false);
         assert_eq!(gfx.toggle(1, 1), true);
-        assert!(gfx.get_pixel(0, 0) && !gfx.get_pixel(0, 1) &&
-            !gfx.get_pixel(1, 0) && !gfx.get_pixel(1, 1));
+        assert!(
+            gfx.get_pixel(0, 0)
+                && !gfx.get_pixel(0, 1)
+                && !gfx.get_pixel(1, 0)
+                && !gfx.get_pixel(1, 1)
+        );
 
         gfx.clear();
-        assert!(!gfx.get_pixel(0, 0) && !gfx.get_pixel(0, 1) &&
-            !gfx.get_pixel(1, 0) && !gfx.get_pixel(1, 1));
-
+        assert!(
+            !gfx.get_pixel(0, 0)
+                && !gfx.get_pixel(0, 1)
+                && !gfx.get_pixel(1, 0)
+                && !gfx.get_pixel(1, 1)
+        );
     }
 }

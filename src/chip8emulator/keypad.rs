@@ -4,9 +4,7 @@ pub struct KeyPad {
 
 impl KeyPad {
     pub fn new() -> KeyPad {
-        KeyPad {
-            state: [false; 16],
-        }
+        KeyPad { state: [false; 16] }
     }
 
     pub fn keydown(&mut self, key: u8) {

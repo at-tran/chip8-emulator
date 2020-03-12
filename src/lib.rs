@@ -1,14 +1,14 @@
 mod chip8emulator;
 
 use chip8emulator::Chip8Emulator;
+use gloo::{events::EventListener, timers::callback::Interval};
+use js_sys::Uint8Array;
+use std::cell::RefCell;
+use std::rc::Rc;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Response;
-use wasm_bindgen::JsCast;
-use js_sys::Uint8Array;
-use gloo::{events::EventListener, timers::callback::Interval};
-use std::rc::Rc;
-use std::cell::RefCell;
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
 // allocator.
@@ -28,17 +28,20 @@ pub async fn main_js() {
     // This provides better error messages in debug mode.
     // It's disabled in release mode so it doesn't bloat up the file size.
     #[cfg(debug_assertions)]
-        console_error_panic_hook::set_once();
+    console_error_panic_hook::set_once();
 
-    let mut chip8 =
-        Rc::new(RefCell::new(Chip8Emulator::new(get_current_time())));
+    let mut chip8 = Rc::new(RefCell::new(Chip8Emulator::new(get_current_time())));
 
-    set_canvas_size(chip8.borrow().get_gfx_width(), chip8.borrow().get_gfx_height());
+    set_canvas_size(
+        chip8.borrow().get_gfx_width(),
+        chip8.borrow().get_gfx_height(),
+    );
 
     let rom_name = "PONG";
     let path = format!("{}/{}", ROMS_DIR, rom_name);
 
-    let buffer = get_binary_file(&path).await
+    let buffer = get_binary_file(&path)
+        .await
         .expect(&format!("Can't load {}", path));
 
     chip8.borrow_mut().load_rom(&buffer);
@@ -53,7 +56,8 @@ pub async fn main_js() {
         if chip8.gfx_needs_rerender() {
             render(&chip8);
         }
-    }).forget();
+    })
+    .forget();
 }
 
 fn set_canvas_size(width: u32, height: u32) {
@@ -108,8 +112,9 @@ fn register_inputs(chip8: &Rc<RefCell<Chip8Emulator>>) {
 }
 
 fn add_input_event<F>(chip8: &Rc<RefCell<Chip8Emulator>>, event: &'static str, f: F)
-    where F: Fn(&Rc<RefCell<Chip8Emulator>>, u8) + 'static {
-
+where
+    F: Fn(&Rc<RefCell<Chip8Emulator>>, u8) + 'static,
+{
     let chip8 = Rc::clone(&chip8);
 
     EventListener::new(&web_sys::window().unwrap(), event, move |e| {
@@ -117,7 +122,8 @@ fn add_input_event<F>(chip8: &Rc<RefCell<Chip8Emulator>>, event: &'static str, f
         if let Some(key) = jskey_to_chip8key(&e.key()) {
             f(&chip8, key);
         }
-    }).forget();
+    })
+    .forget();
 }
 
 fn jskey_to_chip8key(key: &str) -> Option<u8> {
@@ -138,7 +144,7 @@ fn jskey_to_chip8key(key: &str) -> Option<u8> {
         "x" => Some(0),
         "c" => Some(0xB),
         "v" => Some(0xF),
-        _ => None
+        _ => None,
     }
 }
 
@@ -166,6 +172,6 @@ fn get_context() -> web_sys::CanvasRenderingContext2d {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wasm_bindgen_test::{wasm_bindgen_test_configure, wasm_bindgen_test};
+    use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
     wasm_bindgen_test_configure!(run_in_browser);
 }
