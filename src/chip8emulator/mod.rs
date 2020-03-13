@@ -47,7 +47,6 @@ pub struct Chip8Emulator {
     stack: ArrayVec<[u16; 16]>,
     keypad: KeyPad,
     timer: Timer,
-    waiting_for_keypress: Option<u8>,
 }
 
 impl Chip8Emulator {
@@ -67,15 +66,12 @@ impl Chip8Emulator {
             stack: ArrayVec::new(),
             keypad: KeyPad::new(),
             timer: Timer::new(current_time, 1000.0 / 800.0),
-            waiting_for_keypress: None,
         }
     }
 
     pub fn tick(&mut self, current_time: f64) {
         for _ in 0..self.timer.step(current_time) as u32 {
-            if self.waiting_for_keypress.is_none() {
-                self.execute_next_instruction();
-            }
+            self.execute_next_instruction();
         }
 
         self.delay_timer.step(current_time);
@@ -108,9 +104,6 @@ impl Chip8Emulator {
     }
 
     pub fn keydown(&mut self, key: u8) {
-        if let Some(x) = self.waiting_for_keypress.take() {
-            self.V[x as usize] = key;
-        }
         self.keypad.keydown(key);
     }
 
@@ -124,8 +117,8 @@ impl Chip8Emulator {
 
     fn execute_next_instruction(&mut self) {
         let opcode = self.get_next_opcode();
-        web_sys::console::log_1(&format!("{:04X}", opcode.value()).into());
-        web_sys::console::log_1(&format!("{:?}", self.V).into());
+        // web_sys::console::log_1(&format!("{:04X}", opcode.value()).into());
+        // web_sys::console::log_1(&format!("{:?}", self.V).into());
 
         match opcode.get_nibble(0) {
             0 => match opcode.get_nibbles_from(1) {
@@ -338,13 +331,14 @@ impl Chip8Emulator {
     }
 
     fn wait_for_keypress(&mut self, x: u8) {
+        self.pc -= 2;
         for key in 0..=0xf {
             if self.keypad.is_key_down(key) {
                 self.V[x as usize] = key;
+                self.pc += 2;
                 return;
             }
         }
-        self.waiting_for_keypress = Some(x);
     }
 
     fn set_delay(&mut self, x: u8) {
