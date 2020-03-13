@@ -72,14 +72,14 @@ impl Chip8Emulator {
     }
 
     pub fn tick(&mut self, current_time: f64) {
-        self.delay_timer.step(current_time);
-        self.sound_timer.step(current_time);
-
         for _ in 0..self.timer.step(current_time) as u32 {
             if self.waiting_for_keypress.is_none() {
                 self.execute_next_instruction();
             }
         }
+
+        self.delay_timer.step(current_time);
+        self.sound_timer.step(current_time);
     }
 
     pub fn load_rom(&mut self, rom_data: &[u8]) {
@@ -125,6 +125,7 @@ impl Chip8Emulator {
     fn execute_next_instruction(&mut self) {
         let opcode = self.get_next_opcode();
         web_sys::console::log_1(&format!("{:04X}", opcode.value()).into());
+        web_sys::console::log_1(&format!("{:?}", self.V).into());
 
         match opcode.get_nibble(0) {
             0 => match opcode.get_nibbles_from(1) {
@@ -356,7 +357,9 @@ impl Chip8Emulator {
 
     #[allow(non_snake_case)]
     fn add_to_I(&mut self, x: u8) {
-        self.I += self.V[x as usize] as u16
+        let (new_val, carry) = self.I.overflowing_add(self.V[x as usize] as u16);
+        self.I = new_val;
+        self.V[0xf] = carry as u8;
     }
 
     fn store_digit_address(&mut self, x: u8) {

@@ -37,7 +37,7 @@ pub async fn main_js() {
         chip8.borrow().get_gfx_height(),
     );
 
-    let rom_name = "INVADERS";
+    let rom_name = "PONG";
     let path = format!("{}/{}", ROMS_DIR, rom_name);
 
     let buffer = get_binary_file(&path)
