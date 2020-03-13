@@ -1,12 +1,14 @@
 mod chip8timer;
 mod graphics;
 mod keypad;
+mod opcode;
 mod timer;
 
 use arrayvec::ArrayVec;
 use chip8timer::Chip8Timer;
 use graphics::Graphics;
 use keypad::KeyPad;
+use opcode::Opcode;
 use rand;
 use timer::Timer;
 
@@ -107,61 +109,65 @@ impl Chip8Emulator {
         let opcode = self.get_next_opcode();
         // web_sys::console::log_1(&format!("{:X}", opcode).into());
 
-        match get_nibble(opcode, 0) {
-            0 => match get_nibbles(opcode, 1, 4) {
+        match opcode.get_nibble(0) {
+            0 => match opcode.get_nibbles_from(1) {
                 0x0e0 => self.clear_screen(),
                 0x0ee => self.return_subroutine(),
                 address => self.execute_subroutine(address),
             },
-            1 => self.jump_to(get_nibbles(opcode, 1, 4)),
-            2 => self.execute_subroutine(get_nibbles(opcode, 1, 4)),
-            3 => self.skip_if_eq(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
-            4 => self.skip_if_ne(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
-            5 => match get_nibble(opcode, 3) {
-                0 => self.skip_if_eq_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+            1 => self.jump_to(opcode.get_nibbles_from(1)),
+            2 => self.execute_subroutine(opcode.get_nibbles_from(1)),
+            3 => self.skip_if_eq(opcode.get_nibble(1), opcode.get_nibbles_from(2) as u8),
+            4 => self.skip_if_ne(opcode.get_nibble(1), opcode.get_nibbles_from(2) as u8),
+            5 => match opcode.get_nibble(3) {
+                0 => self.skip_if_eq_reg(opcode.get_nibble(1), opcode.get_nibble(2)),
                 _ => Chip8Emulator::invalid_instruction(opcode),
             },
-            6 => self.store(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
-            7 => self.add(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
-            8 => match get_nibble(opcode, 3) {
-                0 => self.store_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
-                1 => self.store_reg_or(get_nibble(opcode, 1), get_nibble(opcode, 2)),
-                2 => self.store_reg_and(get_nibble(opcode, 1), get_nibble(opcode, 2)),
-                3 => self.store_reg_xor(get_nibble(opcode, 1), get_nibble(opcode, 2)),
-                4 => self.add_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
-                5 => self.sub_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
-                6 => self.store_reg_shr1(get_nibble(opcode, 1), get_nibble(opcode, 2)),
-                7 => self.store_reg_sub(get_nibble(opcode, 1), get_nibble(opcode, 2)),
-                0xe => self.store_reg_shl1(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+            6 => self.store(opcode.get_nibble(1), opcode.get_nibbles_from(2) as u8),
+            7 => self.add(opcode.get_nibble(1), opcode.get_nibbles_from(2) as u8),
+            8 => match opcode.get_nibble(3) {
+                0 => self.store_reg(opcode.get_nibble(1), opcode.get_nibble(2)),
+                1 => self.store_reg_or(opcode.get_nibble(1), opcode.get_nibble(2)),
+                2 => self.store_reg_and(opcode.get_nibble(1), opcode.get_nibble(2)),
+                3 => self.store_reg_xor(opcode.get_nibble(1), opcode.get_nibble(2)),
+                4 => self.add_reg(opcode.get_nibble(1), opcode.get_nibble(2)),
+                5 => self.sub_reg(opcode.get_nibble(1), opcode.get_nibble(2)),
+                6 => self.store_reg_shr1(opcode.get_nibble(1), opcode.get_nibble(2)),
+                7 => self.store_reg_sub(opcode.get_nibble(1), opcode.get_nibble(2)),
+                0xe => self.store_reg_shl1(opcode.get_nibble(1), opcode.get_nibble(2)),
                 _ => Chip8Emulator::invalid_instruction(opcode),
             },
-            9 => match get_nibble(opcode, 3) {
-                0 => self.skip_if_ne_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+            9 => match opcode.get_nibble(3) {
+                0 => self.skip_if_ne_reg(opcode.get_nibble(1), opcode.get_nibble(2)),
                 _ => Chip8Emulator::invalid_instruction(opcode),
             },
-            0xa => self.store_address(get_nibbles(opcode, 1, 4)),
-            0xb => self.jump_to_plus_v0(get_nibbles(opcode, 1, 4)),
-            0xc => self.store_random(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
+            0xa => self.store_address(opcode.get_nibbles_from(1)),
+            0xb => self.jump_to_plus_v0(opcode.get_nibbles_from(1)),
+            0xc => self.store_random(opcode.get_nibble(1), opcode.get_nibbles_from(2) as u8),
             0xd => self.draw_sprite(
-                get_nibble(opcode, 1),
-                get_nibble(opcode, 2),
-                get_nibble(opcode, 3),
+                opcode.get_nibble(1),
+                opcode.get_nibble(2),
+                opcode.get_nibble(3),
             ),
-            0xe => match get_nibbles(opcode, 2, 4) {
-                0x9e => self.skip_if_pressed(get_nibble(opcode, 1)),
-                0xa1 => self.skip_if_not_pressed(get_nibble(opcode, 1)),
+            0xe => match opcode.get_nibbles_from(2) {
+                0x9e => self.skip_if_pressed(opcode.get_nibble(1)),
+                0xa1 => self.skip_if_not_pressed(opcode.get_nibble(1)),
                 _ => Chip8Emulator::invalid_instruction(opcode),
             },
-
+            0xf => match opcode.get_nibbles_from(2) {
+                0x07 => self.store_delay(opcode.get_nibble(1)),
+                0x0a => self.wait_for_keypress(opcode.get_nibble(1)),
+                _ => Chip8Emulator::invalid_instruction(opcode),
+            },
             _ => Chip8Emulator::invalid_instruction(opcode),
         }
     }
 
-    fn get_next_opcode(&mut self) -> u16 {
+    fn get_next_opcode(&mut self) -> Opcode {
         let opcode = ((self.memory[self.pc as usize] as u16) << 8)
             + self.memory[self.pc as usize + 1] as u16;
         self.pc += 2;
-        opcode
+        Opcode::new(opcode)
     }
 
     fn clear_screen(&mut self) {
@@ -307,24 +313,9 @@ impl Chip8Emulator {
         self.waiting_for_keypress = Some(x);
     }
 
-    fn invalid_instruction(opcode: u16) {
-        web_sys::console::error_1(&format!("Invalid instruction {:X}", opcode).into())
+    fn invalid_instruction(opcode: Opcode) {
+        web_sys::console::error_1(&format!("Invalid instruction {:X}", opcode.value()).into())
     }
-}
-
-fn get_nibble(value: u16, index: u16) -> u8 {
-    get_nibbles(value, index, index + 1) as u8
-}
-
-fn get_nibbles(value: u16, start_index: u16, end_index: u16) -> u16 {
-    assert!(start_index < end_index);
-    assert!(end_index <= 4);
-
-    let mut mask = 0;
-    for i in start_index..end_index {
-        mask += 0xf << (3 - i) * 4;
-    }
-    (value & mask) >> (4 - end_index) * 4
 }
 
 #[cfg(test)]
@@ -373,16 +364,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_nibbles() {
-        assert_eq!(get_nibbles(0x3a7b, 1, 3), 0xa7);
-        assert_eq!(get_nibbles(0x3a7b, 2, 3), 0x7);
-        assert_eq!(get_nibbles(0x3a7b, 2, 4), 0x7b);
-        assert_eq!(get_nibbles(0x3a7b, 0, 4), 0x3a7b);
-        assert_eq!(get_nibble(0x3a7b, 0), 0x3);
-        assert_eq!(get_nibble(0x3a7b, 3), 0xb);
-    }
-
-    #[test]
     fn test_get_next_opcode() {
         let mut chip8 = Chip8Emulator::new(0.0);
         let data = [
@@ -396,7 +377,7 @@ mod tests {
 
         chip8.load_rom(&data);
         for opcode in opcodes.iter() {
-            assert_eq!(chip8.get_next_opcode(), *opcode)
+            assert_eq!(chip8.get_next_opcode().value(), *opcode)
         }
     }
 
@@ -466,7 +447,7 @@ mod tests {
         assert_eq!(chip8.V[0], 10);
         chip8.add(x, 5);
         assert_eq!(chip8.V[0], 15);
-        chip8.add(x, get_nibbles(0x7005, 2, 4) as u8);
+        chip8.add(x, Opcode::new(0x7005).get_nibbles_from(2) as u8);
         assert_eq!(chip8.V[0], 20);
         chip8.store(y, 25);
         chip8.store_reg(x, y);
