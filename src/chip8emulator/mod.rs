@@ -235,7 +235,7 @@ impl Chip8Emulator {
     }
 
     fn add(&mut self, x: u8, y: u8) {
-        self.V[x as usize] += y;
+        self.V[x as usize] = self.V[x as usize].wrapping_add(y);
     }
 
     fn store_reg(&mut self, x: u8, y: u8) {
@@ -346,6 +346,7 @@ impl Chip8Emulator {
         self.sound_timer.set_value(self.V[x as usize]);
     }
 
+    #[allow(non_snake_case)]
     fn add_to_I(&mut self, x: u8) {
         self.I += self.V[x as usize] as u16
     }

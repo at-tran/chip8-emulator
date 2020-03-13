@@ -2,7 +2,7 @@
   "author": "Anh Tuan Tran <nhanhnhanh17399@gmail.com>",
   "name": "chip8-emulator",
   "version": "0.1.0",
-  "license" : "(MIT OR Apache-2.0)",
+  "license": "(MIT OR Apache-2.0)",
   "scripts": {
     "build": "rimraf dist pkg && webpack",
     "start": "rimraf dist pkg && webpack-dev-server --open -d",
