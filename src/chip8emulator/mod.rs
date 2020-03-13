@@ -29,7 +29,6 @@ pub struct Chip8Emulator {
     keypad: KeyPad,
     timer: Timer,
     waiting_for_keypress: Option<u8>,
-    time_needs_updating: bool,
 }
 
 impl Chip8Emulator {
@@ -46,15 +45,12 @@ impl Chip8Emulator {
             keypad: KeyPad::new(),
             timer: Timer::new(current_time, 1000.0 / 600.0),
             waiting_for_keypress: None,
-            time_needs_updating: false,
         }
     }
 
     pub fn tick(&mut self, current_time: f64) {
-        if self.time_needs_updating {
-            self.timer.step(current_time);
-            self.time_needs_updating = false;
-        }
+        self.delay_timer.step(current_time);
+        self.sound_timer.step(current_time);
 
         for _ in 0..self.timer.step(current_time) as u32 {
             if self.waiting_for_keypress.is_none() {
@@ -89,10 +85,8 @@ impl Chip8Emulator {
     }
 
     pub fn keydown(&mut self, key: u8) {
-        if let Some(x) = self.waiting_for_keypress {
+        if let Some(x) = self.waiting_for_keypress.take() {
             self.V[x as usize] = key;
-            self.waiting_for_keypress = None;
-            self.time_needs_updating = true;
         }
         self.keypad.keydown(key);
     }
