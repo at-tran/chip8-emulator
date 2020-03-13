@@ -7,6 +7,7 @@ use arrayvec::ArrayVec;
 use chip8timer::Chip8Timer;
 use graphics::Graphics;
 use keypad::KeyPad;
+use rand;
 use timer::Timer;
 
 const WIDTH: u32 = 64;
@@ -118,6 +119,13 @@ impl Chip8Emulator {
                 0xe => self.store_reg_shl1(get_nibble(opcode, 1), get_nibble(opcode, 2)),
                 _ => Chip8Emulator::invalid_instruction(opcode),
             },
+            9 => match get_nibble(opcode, 3) {
+                0 => self.skip_if_ne_reg(get_nibble(opcode, 1), get_nibble(opcode, 2)),
+                _ => Chip8Emulator::invalid_instruction(opcode),
+            },
+            0xa => self.store_address(get_nibbles(opcode, 1, 4)),
+            0xb => self.jump_to_plus_v0(get_nibbles(opcode, 1, 4)),
+            0xc => self.store_random(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
 
             _ => Chip8Emulator::invalid_instruction(opcode),
         }
@@ -215,6 +223,24 @@ impl Chip8Emulator {
     fn store_reg_shl1(&mut self, x: u8, y: u8) {
         self.V[0xf] = (self.V[y as usize] >> 7) & 0x1;
         self.V[x as usize] = self.V[y as usize] << 1;
+    }
+
+    fn skip_if_ne_reg(&mut self, x: u8, y: u8) {
+        if self.V[x as usize] != self.V[y as usize] {
+            self.pc += 2;
+        }
+    }
+
+    fn store_address(&mut self, address: u16) {
+        self.I = address;
+    }
+
+    fn jump_to_plus_v0(&mut self, address: u16) {
+        self.jump_to(address + self.V[0] as u16)
+    }
+
+    fn store_random(&mut self, x: u8, mask: u8) {
+        self.V[x as usize] = rand::random::<u8>() & mask;
     }
 
     fn invalid_instruction(opcode: u16) {
@@ -340,6 +366,16 @@ mod tests {
         assert_eq!(chip8.pc, 4);
         chip8.skip_if_eq_reg(0, 1);
         assert_eq!(chip8.pc, 6);
+        chip8.skip_if_ne_reg(0, 1);
+        assert_eq!(chip8.pc, 6);
+        chip8.skip_if_ne_reg(0, 2);
+        assert_eq!(chip8.pc, 8);
+
+        chip8.store_address(0xad13);
+        assert_eq!(chip8.I, 0xad13);
+        chip8.store(0, 5);
+        chip8.jump_to_plus_v0(10);
+        assert_eq!(chip8.pc, 15);
     }
 
     #[test]
@@ -403,5 +439,15 @@ mod tests {
         chip8.store_reg_shl1(x, y);
         assert_eq!(chip8.V[x as usize], 0);
         assert_eq!(chip8.V[0xf], 1);
+    }
+
+    #[test]
+    fn test_rand() {
+        let mut chip8 = Chip8Emulator::new(0.0);
+        for _ in 1..10 {
+            chip8.store_random(0, 0xff);
+            assert!(chip8.V[0] <= std::u8::MAX);
+            assert!(chip8.V[0] >= std::u8::MIN);
+        }
     }
 }

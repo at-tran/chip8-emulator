@@ -30,6 +30,8 @@ arrayvec = "0.5.1"
 wasm-bindgen-futures = "0.4.8"
 js-sys = "0.3.35"
 gloo = "0.2.0"
+rand = "0.7.3"
+getrandom = { version = "0.1.14", features = ["wasm-bindgen"] }
 
 # `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
 # compared to the default allocator's ~10K. However, it is slower than the default
