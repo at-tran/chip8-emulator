@@ -9,8 +9,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
-    window, CanvasRenderingContext2d, HtmlCanvasElement, HtmlSelectElement, KeyboardEvent,
-    Performance, Response,
+    window, CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, HtmlSelectElement,
+    KeyboardEvent, Performance, Response,
 };
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
@@ -130,15 +130,9 @@ fn register_rom_select(chip8: &Rc<RefCell<Chip8Emulator>>) {
         let e = e.clone();
         let chip8 = Rc::clone(&chip8);
         spawn_local(async move {
-            load_rom(
-                &chip8,
-                &e.target()
-                    .unwrap()
-                    .dyn_into::<HtmlSelectElement>()
-                    .unwrap()
-                    .value(),
-            )
-            .await;
+            let e = e.target().unwrap();
+            e.dyn_ref::<HtmlElement>().unwrap().blur().unwrap();
+            load_rom(&chip8, &e.dyn_into::<HtmlSelectElement>().unwrap().value()).await;
         });
     })
     .forget();
