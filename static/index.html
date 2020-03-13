@@ -8,7 +8,7 @@
 
 <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
 
-<select id="rom-name">
+<select id="rom-name" class="rom-select-box">
     <option value="15PUZZLE">15PUZZLE</option>
     <option value="BLINKY">BLINKY</option>
     <option value="BLITZ">BLITZ</option>
@@ -34,6 +34,10 @@
     <option value="VERS">VERS</option>
     <option value="WIPEOFF">WIPEOFF</option>
 </select>
+
+<input id="ticks-per-second" type="range" min="1" max="3000" value="600">
+<label for="ticks-per-second" class="ticks-per-second-text">Tick rate: <span id="ticks-per-second-text">600</span> per second</label>
+
 <canvas id="canvas"></canvas>
 
 <script src="index.js"></script>

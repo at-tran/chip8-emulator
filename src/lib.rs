@@ -9,8 +9,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
-    window, CanvasRenderingContext2d, HtmlCanvasElement, HtmlElement, HtmlSelectElement,
-    KeyboardEvent, Performance, Response,
+    window, CanvasRenderingContext2d, Element, HtmlCanvasElement, HtmlElement, HtmlInputElement,
+    HtmlSelectElement, KeyboardEvent, Performance, Response,
 };
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
@@ -45,6 +45,8 @@ pub async fn main_js() {
     register_inputs(&chip8);
 
     register_rom_select(&chip8);
+
+    register_tps_select(&chip8);
 
     start(&chip8);
 }
@@ -116,12 +118,7 @@ async fn get_binary_file(path: &str) -> Result<Vec<u8>, JsValue> {
 }
 
 fn register_rom_select(chip8: &Rc<RefCell<Chip8Emulator>>) {
-    let rom_name_select = window()
-        .unwrap()
-        .document()
-        .unwrap()
-        .get_element_by_id("rom-name")
-        .expect("No element with id #rom-name")
+    let rom_name_select = get_element_by_id("rom-name")
         .dyn_into::<HtmlSelectElement>()
         .expect("Element with id #rom-name is not a select element");
 
@@ -134,6 +131,32 @@ fn register_rom_select(chip8: &Rc<RefCell<Chip8Emulator>>) {
             e.dyn_ref::<HtmlElement>().unwrap().blur().unwrap();
             load_rom(&chip8, &e.dyn_into::<HtmlSelectElement>().unwrap().value()).await;
         });
+    })
+    .forget();
+}
+
+fn register_tps_select(chip8: &Rc<RefCell<Chip8Emulator>>) {
+    let tps_select = get_element_by_id("ticks-per-second")
+        .dyn_into::<HtmlInputElement>()
+        .expect("Element with id #ticks-per-second is not an input element");
+
+    let chip8 = Rc::clone(&chip8);
+    EventListener::new(&tps_select, "change", move |e| {
+        let e = e.target().unwrap();
+        e.dyn_ref::<HtmlElement>().unwrap().blur().unwrap();
+        let new_tps = e
+            .dyn_into::<HtmlInputElement>()
+            .unwrap()
+            .value()
+            .parse()
+            .unwrap();
+
+        chip8.borrow_mut().set_ticks_per_second(new_tps);
+
+        get_element_by_id("ticks-per-second-text")
+            .dyn_into::<HtmlElement>()
+            .expect("Element with id #ticks-per-second is not a text element")
+            .set_inner_text(&new_tps.to_string());
     })
     .forget();
 }
@@ -163,6 +186,15 @@ where
     .forget();
 }
 
+fn get_element_by_id(id: &str) -> Element {
+    window()
+        .unwrap()
+        .document()
+        .unwrap()
+        .get_element_by_id(id)
+        .expect(&format!("No element with id {}", id))
+}
+
 fn jskey_to_chip8key(key: &str) -> Option<u8> {
     match key {
         "1" => Some(1),
@@ -190,8 +222,7 @@ thread_local! {
         window().unwrap().performance().unwrap();
 
     static CONTEXT: CanvasRenderingContext2d =
-        window().unwrap().document().unwrap()
-            .get_element_by_id("canvas").expect("No element with id #canvas")
+        get_element_by_id("canvas")
             .dyn_into::<HtmlCanvasElement>()
             .expect("Element with id #canvas is not a canvas")
             .get_context("2d").unwrap().unwrap()

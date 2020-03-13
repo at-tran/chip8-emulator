@@ -58,6 +58,7 @@ features = [
   'KeyboardEvent',
   'HtmlSelectElement',
   'HtmlElement',
+  'HtmlInputElement',
 ]
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
