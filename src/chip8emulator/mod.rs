@@ -310,7 +310,10 @@ impl Chip8Emulator {
             let row = self.memory[self.I as usize + dy as usize];
             for dx in 0..8 {
                 if (row >> (7 - dx) & 1) == 1 {
-                    if self.gfx.toggle((x + dx) as u32, (y + dy) as u32) {
+                    if self
+                        .gfx
+                        .toggle(((x + dx) % WIDTH) as u32, ((y + dy) % HEIGHT) as u32)
+                    {
                         self.V[0xf] = 1;
                     }
                 }
