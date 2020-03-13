@@ -235,7 +235,7 @@ impl Chip8Emulator {
     }
 
     fn add(&mut self, x: u8, val: u8) {
-        self.V[x as usize] += val;
+        self.V[x as usize] = self.V[x as usize].wrapping_add(val);
     }
 
     fn store_reg(&mut self, x: u8, y: u8) {
