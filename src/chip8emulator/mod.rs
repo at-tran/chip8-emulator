@@ -151,6 +151,9 @@ impl Chip8Emulator {
             0xf => match opcode.get_nibbles_from(2) {
                 0x07 => self.store_delay(opcode.get_nibble(1)),
                 0x0a => self.wait_for_keypress(opcode.get_nibble(1)),
+                0x15 => self.set_delay(opcode.get_nibble(1)),
+                0x18 => self.set_sound(opcode.get_nibble(1)),
+                0x1e => self.add_to_I(opcode.get_nibble(1)),
                 _ => Chip8Emulator::invalid_instruction(opcode),
             },
             _ => Chip8Emulator::invalid_instruction(opcode),
@@ -307,6 +310,18 @@ impl Chip8Emulator {
         self.waiting_for_keypress = Some(x);
     }
 
+    fn set_delay(&mut self, x: u8) {
+        self.delay_timer.set_value(self.V[x as usize]);
+    }
+
+    fn set_sound(&mut self, x: u8) {
+        self.sound_timer.set_value(self.V[x as usize]);
+    }
+
+    fn add_to_I(&mut self, x: u8) {
+        self.I += self.V[x as usize] as u16
+    }
+
     fn invalid_instruction(opcode: Opcode) {
         web_sys::console::error_1(&format!("Invalid instruction {:X}", opcode.value()).into())
     }
@@ -416,6 +431,9 @@ mod tests {
         chip8.jump_to_plus_v0(10);
         assert_eq!(chip8.pc, 15);
 
+        chip8.store(0xa, 0xa);
+        chip8.store(0xb, 0xb);
+
         chip8.keydown(0xa);
         chip8.skip_if_pressed(0xb);
         assert_eq!(chip8.pc, 15);
@@ -518,7 +536,11 @@ mod tests {
         chip8.memory[5] = 0b11110000;
         chip8.memory[6] = 0b00001111;
         chip8.memory[7] = 0b10101010;
-        chip8.store_address(5);
+        chip8.store_address(2);
+
+        chip8.store(8, 3);
+        chip8.add_to_I(8);
+        // Now, I == 5
 
         chip8.draw_sprite(0, 1, 3);
         assert!(chip8.gfx_needs_rerender());
