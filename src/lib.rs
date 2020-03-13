@@ -40,12 +40,17 @@ pub async fn main_js() {
         chip8.borrow().get_gfx_height(),
     );
 
-    load_rom(&mut chip8.borrow_mut(), "INVADERS").await;
+    load_rom(&chip8, "INVADERS").await;
 
     register_inputs(&chip8);
 
     register_rom_select(&chip8);
 
+    start(&chip8);
+}
+
+fn start(chip8: &Rc<RefCell<Chip8Emulator>>) {
+    let chip8 = Rc::clone(&chip8);
     Interval::new(1, move || {
         let mut chip8 = chip8.borrow_mut();
 
@@ -58,15 +63,15 @@ pub async fn main_js() {
     .forget();
 }
 
-async fn load_rom(chip8: &mut Chip8Emulator, rom_name: &str) {
-    chip8.reset(get_current_time());
+async fn load_rom(chip8: &Rc<RefCell<Chip8Emulator>>, rom_name: &str) {
     let path = format!("{}/{}", ROMS_DIR, rom_name);
 
     let buffer = get_binary_file(&path)
         .await
         .expect(&format!("Can't load {}", path));
 
-    chip8.load_rom(&buffer);
+    chip8.borrow_mut().reset(get_current_time());
+    chip8.borrow_mut().load_rom(&buffer);
 }
 
 fn set_canvas_size(width: u32, height: u32) {
@@ -126,7 +131,7 @@ fn register_rom_select(chip8: &Rc<RefCell<Chip8Emulator>>) {
         let chip8 = Rc::clone(&chip8);
         spawn_local(async move {
             load_rom(
-                &mut chip8.borrow_mut(),
+                &chip8,
                 &e.target()
                     .unwrap()
                     .dyn_into::<HtmlSelectElement>()
