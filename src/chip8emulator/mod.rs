@@ -53,9 +53,8 @@ pub struct Chip8Emulator {
 impl Chip8Emulator {
     pub fn new(current_time: f64) -> Chip8Emulator {
         let mut memory = [0; 4096];
-        for (i, &byte) in FONT_MEMORY.iter().enumerate() {
-            memory[FONT_MEMORY_START + i] = byte;
-        }
+        memory[FONT_MEMORY_START..FONT_MEMORY_START + FONT_MEMORY.len()]
+            .copy_from_slice(&FONT_MEMORY);
 
         Chip8Emulator {
             memory,
@@ -67,7 +66,7 @@ impl Chip8Emulator {
             sound_timer: Chip8Timer::new(current_time),
             stack: ArrayVec::new(),
             keypad: KeyPad::new(),
-            timer: Timer::new(current_time, 1000.0 / 600.0),
+            timer: Timer::new(current_time, 1000.0 / 800.0),
             waiting_for_keypress: None,
         }
     }
@@ -125,7 +124,7 @@ impl Chip8Emulator {
 
     fn execute_next_instruction(&mut self) {
         let opcode = self.get_next_opcode();
-        // web_sys::console::log_1(&format!("{:X}", opcode).into());
+        web_sys::console::log_1(&format!("{:04X}", opcode.value()).into());
 
         match opcode.get_nibble(0) {
             0 => match opcode.get_nibbles_from(1) {
@@ -234,8 +233,8 @@ impl Chip8Emulator {
         self.V[x as usize] = val;
     }
 
-    fn add(&mut self, x: u8, y: u8) {
-        self.V[x as usize] = self.V[x as usize].wrapping_add(y);
+    fn add(&mut self, x: u8, val: u8) {
+        self.V[x as usize] += val;
     }
 
     fn store_reg(&mut self, x: u8, y: u8) {
@@ -267,8 +266,8 @@ impl Chip8Emulator {
     }
 
     fn store_reg_shr1(&mut self, x: u8, y: u8) {
-        self.V[0xf] = self.V[y as usize] & 0x1;
-        self.V[x as usize] = self.V[y as usize] >> 1;
+        self.V[0xf] = self.V[x as usize] & 0x1;
+        self.V[x as usize] >>= 1;
     }
 
     fn store_reg_sub(&mut self, x: u8, y: u8) {
@@ -278,8 +277,8 @@ impl Chip8Emulator {
     }
 
     fn store_reg_shl1(&mut self, x: u8, y: u8) {
-        self.V[0xf] = (self.V[y as usize] >> 7) & 0x1;
-        self.V[x as usize] = self.V[y as usize] << 1;
+        self.V[0xf] = self.V[x as usize] & 0x80;
+        self.V[x as usize] <<= 1;
     }
 
     fn skip_if_ne_reg(&mut self, x: u8, y: u8) {
@@ -338,6 +337,12 @@ impl Chip8Emulator {
     }
 
     fn wait_for_keypress(&mut self, x: u8) {
+        for key in 0..=0xf {
+            if self.keypad.is_key_down(key) {
+                self.V[x as usize] = key;
+                return;
+            }
+        }
         self.waiting_for_keypress = Some(x);
     }
 
@@ -359,32 +364,22 @@ impl Chip8Emulator {
     }
 
     fn store_bcd(&mut self, x: u8) {
-        let mut value = self.V[x as usize];
+        let value = self.V[x as usize];
         self.memory[self.I as usize] = value / 100;
-        value = value % 100;
-        self.memory[self.I as usize + 1] = value / 10;
-        value = value % 10;
-        self.memory[self.I as usize + 2] = value;
+        self.memory[self.I as usize + 1] = (value / 10) % 10;
+        self.memory[self.I as usize + 2] = value % 10;
     }
 
     fn store_regs_in_memory(&mut self, x: u8) {
-        for (reg_data, mem_data) in self.V[..=x as usize]
-            .iter()
-            .zip(self.memory[self.I as usize..].iter_mut())
-        {
-            *mem_data = *reg_data;
-        }
-        self.I += x as u16 + 1;
+        self.memory[self.I as usize..=self.I as usize + x as usize]
+            .copy_from_slice(&self.V[..=x as usize]);
+        // self.I += x as u16 + 1;
     }
 
     fn store_memory_in_regs(&mut self, x: u8) {
-        for (reg_data, mem_data) in self.V[..=x as usize]
-            .iter_mut()
-            .zip(self.memory[self.I as usize..].iter())
-        {
-            *reg_data = *mem_data;
-        }
-        self.I += x as u16 + 1;
+        self.V[..=x as usize]
+            .copy_from_slice(&self.memory[self.I as usize..=self.I as usize + x as usize]);
+        // self.I += x as u16 + 1;
     }
 
     fn invalid_instruction(opcode: Opcode) {
