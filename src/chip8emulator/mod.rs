@@ -15,6 +15,25 @@ use timer::Timer;
 const WIDTH: u8 = 64;
 const HEIGHT: u8 = 32;
 const PROGRAM_MEMORY_START: usize = 0x200;
+const FONT_MEMORY_START: usize = 0x050;
+const FONT_MEMORY: [u8; 80] = [
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80, // F
+];
 
 #[allow(non_snake_case)]
 pub struct Chip8Emulator {
@@ -33,8 +52,13 @@ pub struct Chip8Emulator {
 
 impl Chip8Emulator {
     pub fn new(current_time: f64) -> Chip8Emulator {
+        let mut memory = [0; 4096];
+        for (i, &byte) in FONT_MEMORY.iter().enumerate() {
+            memory[FONT_MEMORY_START + i] = byte;
+        }
+
         Chip8Emulator {
-            memory: [0; 4096],
+            memory,
             V: [0; 16],
             I: 0,
             pc: PROGRAM_MEMORY_START as u16,
@@ -154,6 +178,10 @@ impl Chip8Emulator {
                 0x15 => self.set_delay(opcode.get_nibble(1)),
                 0x18 => self.set_sound(opcode.get_nibble(1)),
                 0x1e => self.add_to_I(opcode.get_nibble(1)),
+                0x29 => self.store_digit_address(opcode.get_nibble(1)),
+                0x33 => self.store_bcd(opcode.get_nibble(1)),
+                0x55 => self.store_regs_in_memory(opcode.get_nibble(1)),
+                0x65 => self.store_memory_in_regs(opcode.get_nibble(1)),
                 _ => Chip8Emulator::invalid_instruction(opcode),
             },
             _ => Chip8Emulator::invalid_instruction(opcode),
@@ -320,6 +348,39 @@ impl Chip8Emulator {
 
     fn add_to_I(&mut self, x: u8) {
         self.I += self.V[x as usize] as u16
+    }
+
+    fn store_digit_address(&mut self, x: u8) {
+        self.I = FONT_MEMORY_START as u16 + self.V[x as usize] as u16 * 5;
+    }
+
+    fn store_bcd(&mut self, x: u8) {
+        let mut value = self.V[x as usize];
+        self.memory[self.I as usize] = value / 100;
+        value = value % 100;
+        self.memory[self.I as usize + 1] = value / 10;
+        value = value % 10;
+        self.memory[self.I as usize + 2] = value;
+    }
+
+    fn store_regs_in_memory(&mut self, x: u8) {
+        for (reg_data, mem_data) in self.V[..=x as usize]
+            .iter()
+            .zip(self.memory[self.I as usize..].iter_mut())
+        {
+            *mem_data = *reg_data;
+        }
+        self.I += x as u16 + 1;
+    }
+
+    fn store_memory_in_regs(&mut self, x: u8) {
+        for (reg_data, mem_data) in self.V[..=x as usize]
+            .iter_mut()
+            .zip(self.memory[self.I as usize..].iter())
+        {
+            *reg_data = *mem_data;
+        }
+        self.I += x as u16 + 1;
     }
 
     fn invalid_instruction(opcode: Opcode) {
@@ -563,5 +624,47 @@ mod tests {
         assert_eq!(chip8.get_gfx_pixel(13, 11), false);
         assert_eq!(chip8.get_gfx_pixel(10, 12), false);
         assert_eq!(chip8.get_gfx_pixel(11, 12), false);
+    }
+
+    #[test]
+    fn test_digit_address() {
+        let mut chip8 = Chip8Emulator::new(0.0);
+        chip8.store(0, 0);
+        chip8.store_digit_address(0);
+        assert_eq!(chip8.I, FONT_MEMORY_START as u16);
+        chip8.store(0, 0x9);
+        chip8.store_digit_address(0);
+        assert_eq!(chip8.I, FONT_MEMORY_START as u16 + 45);
+        chip8.store(0, 0xf);
+        chip8.store_digit_address(0);
+        assert_eq!(chip8.I, FONT_MEMORY_START as u16 + 75);
+    }
+
+    #[test]
+    fn test_store_bcd() {
+        let mut chip8 = Chip8Emulator::new(0.0);
+        chip8.store(5, 142);
+        chip8.store_address(10);
+        chip8.store_bcd(5);
+        assert_eq!(chip8.memory[10], 1);
+        assert_eq!(chip8.memory[11], 4);
+        assert_eq!(chip8.memory[12], 2);
+    }
+
+    #[test]
+    fn test_store_reg_mem() {
+        let mut chip8 = Chip8Emulator::new(0.0);
+        chip8.store_address(FONT_MEMORY_START as u16);
+        chip8.store_memory_in_regs(0xf);
+        assert_eq!(chip8.V[0], 0xF0);
+        assert_eq!(chip8.V[0x9], 0x70);
+        assert_eq!(chip8.V[0xf], 0xF0);
+
+        chip8.store_address(0);
+        chip8.store_regs_in_memory(0xf);
+        assert_eq!(chip8.memory[0], 0xF0);
+        assert_eq!(chip8.memory[0x9], 0x70);
+        assert_eq!(chip8.memory[0xf], 0xF0);
+        assert_eq!(chip8.memory[0xf + 1], 0);
     }
 }
