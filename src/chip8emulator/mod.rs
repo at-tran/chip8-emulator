@@ -266,7 +266,7 @@ impl Chip8Emulator {
         self.V[0xf] = (!borrow) as u8;
     }
 
-    fn store_reg_shr1(&mut self, x: u8, y: u8) {
+    fn store_reg_shr1(&mut self, x: u8, _: u8) {
         self.V[0xf] = self.V[x as usize] & 0x1;
         self.V[x as usize] >>= 1;
     }
@@ -277,7 +277,7 @@ impl Chip8Emulator {
         self.V[0xf] = (!borrow) as u8;
     }
 
-    fn store_reg_shl1(&mut self, x: u8, y: u8) {
+    fn store_reg_shl1(&mut self, x: u8, _: u8) {
         self.V[0xf] = self.V[x as usize] & 0x80;
         self.V[x as usize] <<= 1;
     }
@@ -557,7 +557,7 @@ mod tests {
         assert_eq!(chip8.V[x as usize], 254);
         assert_eq!(chip8.V[0xf], 0);
 
-        chip8.store(y, 0b10);
+        chip8.store(x, 0b10);
         chip8.store_reg_shr1(x, y);
         assert_eq!(chip8.V[x as usize], 1);
         assert_eq!(chip8.V[0xf], 0);
@@ -568,10 +568,10 @@ mod tests {
         assert_eq!(chip8.V[x as usize], 251);
         assert_eq!(chip8.V[0xf], 0);
 
-        chip8.store(y, 0x80);
+        chip8.store(x, 0x80);
         chip8.store_reg_shl1(x, y);
         assert_eq!(chip8.V[x as usize], 0);
-        assert_eq!(chip8.V[0xf], 1);
+        assert_eq!(chip8.V[0xf], 0x80);
     }
 
     #[test]
