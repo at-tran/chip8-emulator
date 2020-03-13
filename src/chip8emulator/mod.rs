@@ -10,8 +10,8 @@ use keypad::KeyPad;
 use rand;
 use timer::Timer;
 
-const WIDTH: u32 = 64;
-const HEIGHT: u32 = 32;
+const WIDTH: u8 = 64;
+const HEIGHT: u8 = 32;
 const PROGRAM_MEMORY_START: usize = 0x200;
 
 #[allow(non_snake_case)]
@@ -35,7 +35,7 @@ impl Chip8Emulator {
             V: [0; 16],
             I: 0,
             pc: PROGRAM_MEMORY_START as u16,
-            gfx: Graphics::new(WIDTH, HEIGHT),
+            gfx: Graphics::new(WIDTH as u32, HEIGHT as u32),
             delay_timer: Chip8Timer::new(current_time),
             sound_timer: Chip8Timer::new(current_time),
             stack: ArrayVec::new(),
@@ -243,6 +243,24 @@ impl Chip8Emulator {
         self.V[x as usize] = rand::random::<u8>() & mask;
     }
 
+    fn draw_sprite(&mut self, x: u8, y: u8, n: u8) {
+        let x = self.V[x as usize] % WIDTH;
+        let y = self.V[y as usize] % HEIGHT;
+
+        self.V[0xf] = 0;
+
+        for dy in 0..n {
+            let row = self.memory[self.I as usize + dy as usize];
+            for dx in 0..8 {
+                if (row >> (7 - dx) & 1) == 1 {
+                    if self.gfx.toggle((x + dx) as u32, (y + dy) as u32) {
+                        self.V[0xf] = 1;
+                    }
+                }
+            }
+        }
+    }
+
     fn invalid_instruction(opcode: u16) {
         web_sys::console::error_1(&format!("Invalid instruction {:X}", opcode).into())
     }
@@ -298,8 +316,8 @@ mod tests {
     fn test_gfx() {
         let mut chip8 = Chip8Emulator::new(0.0);
 
-        assert_eq!(chip8.get_gfx_width(), WIDTH);
-        assert_eq!(chip8.get_gfx_height(), HEIGHT);
+        assert_eq!(chip8.get_gfx_width(), WIDTH as u32);
+        assert_eq!(chip8.get_gfx_height(), HEIGHT as u32);
         assert!(chip8.gfx_needs_rerender());
         assert!(!chip8.gfx_needs_rerender());
         assert!(!chip8.get_gfx_pixel(5, 5));
@@ -449,5 +467,45 @@ mod tests {
             assert!(chip8.V[0] <= std::u8::MAX);
             assert!(chip8.V[0] >= std::u8::MIN);
         }
+    }
+
+    #[test]
+    fn test_draw_sprite() {
+        let mut chip8 = Chip8Emulator::new(0.0);
+        assert!(chip8.gfx_needs_rerender());
+
+        chip8.store(0, 10);
+        chip8.store(1, 10);
+
+        chip8.draw_sprite(0, 1, 3);
+        assert!(!chip8.gfx_needs_rerender());
+        assert_eq!(chip8.V[0xf], 0);
+
+        chip8.memory[5] = 0b11110000;
+        chip8.memory[6] = 0b00001111;
+        chip8.memory[7] = 0b10101010;
+        chip8.store_address(5);
+
+        chip8.draw_sprite(0, 1, 3);
+        assert!(chip8.gfx_needs_rerender());
+        assert_eq!(chip8.V[0xf], 0);
+        assert_eq!(chip8.get_gfx_pixel(10, 10), true);
+        assert_eq!(chip8.get_gfx_pixel(11, 10), true);
+        assert_eq!(chip8.get_gfx_pixel(14, 10), false);
+        assert_eq!(chip8.get_gfx_pixel(14, 11), true);
+        assert_eq!(chip8.get_gfx_pixel(13, 11), false);
+        assert_eq!(chip8.get_gfx_pixel(10, 12), true);
+        assert_eq!(chip8.get_gfx_pixel(11, 12), false);
+
+        chip8.draw_sprite(0, 1, 3);
+        assert!(chip8.gfx_needs_rerender());
+        assert_eq!(chip8.V[0xf], 1);
+        assert_eq!(chip8.get_gfx_pixel(10, 10), false);
+        assert_eq!(chip8.get_gfx_pixel(11, 10), false);
+        assert_eq!(chip8.get_gfx_pixel(14, 10), false);
+        assert_eq!(chip8.get_gfx_pixel(14, 11), false);
+        assert_eq!(chip8.get_gfx_pixel(13, 11), false);
+        assert_eq!(chip8.get_gfx_pixel(10, 12), false);
+        assert_eq!(chip8.get_gfx_pixel(11, 12), false);
     }
 }
