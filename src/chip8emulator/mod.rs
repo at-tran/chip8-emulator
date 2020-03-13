@@ -26,6 +26,8 @@ pub struct Chip8Emulator {
     stack: ArrayVec<[u16; 16]>,
     keypad: KeyPad,
     timer: Timer,
+    waiting_for_keypress: Option<u8>,
+    time_needs_updating: bool,
 }
 
 impl Chip8Emulator {
@@ -41,12 +43,21 @@ impl Chip8Emulator {
             stack: ArrayVec::new(),
             keypad: KeyPad::new(),
             timer: Timer::new(current_time, 1000.0 / 600.0),
+            waiting_for_keypress: None,
+            time_needs_updating: false,
         }
     }
 
     pub fn tick(&mut self, current_time: f64) {
+        if self.time_needs_updating {
+            self.timer.step(current_time);
+            self.time_needs_updating = false;
+        }
+
         for _ in 0..self.timer.step(current_time) as u32 {
-            self.execute_next_instruction();
+            if self.waiting_for_keypress.is_none() {
+                self.execute_next_instruction();
+            }
         }
     }
 
@@ -76,6 +87,11 @@ impl Chip8Emulator {
     }
 
     pub fn keydown(&mut self, key: u8) {
+        if let Some(x) = self.waiting_for_keypress {
+            self.V[x as usize] = key;
+            self.waiting_for_keypress = None;
+            self.time_needs_updating = true;
+        }
         self.keypad.keydown(key);
     }
 
@@ -126,6 +142,16 @@ impl Chip8Emulator {
             0xa => self.store_address(get_nibbles(opcode, 1, 4)),
             0xb => self.jump_to_plus_v0(get_nibbles(opcode, 1, 4)),
             0xc => self.store_random(get_nibble(opcode, 1), get_nibbles(opcode, 2, 4) as u8),
+            0xd => self.draw_sprite(
+                get_nibble(opcode, 1),
+                get_nibble(opcode, 2),
+                get_nibble(opcode, 3),
+            ),
+            0xe => match get_nibbles(opcode, 2, 4) {
+                0x9e => self.skip_if_pressed(get_nibble(opcode, 1)),
+                0xa1 => self.skip_if_not_pressed(get_nibble(opcode, 1)),
+                _ => Chip8Emulator::invalid_instruction(opcode),
+            },
 
             _ => Chip8Emulator::invalid_instruction(opcode),
         }
@@ -261,6 +287,26 @@ impl Chip8Emulator {
         }
     }
 
+    fn skip_if_pressed(&mut self, x: u8) {
+        if self.keypad.is_key_down(self.V[x as usize]) {
+            self.pc += 2;
+        }
+    }
+
+    fn skip_if_not_pressed(&mut self, x: u8) {
+        if !self.keypad.is_key_down(self.V[x as usize]) {
+            self.pc += 2;
+        }
+    }
+
+    fn store_delay(&mut self, x: u8) {
+        self.V[x as usize] = self.delay_timer.value();
+    }
+
+    fn wait_for_keypress(&mut self, x: u8) {
+        self.waiting_for_keypress = Some(x);
+    }
+
     fn invalid_instruction(opcode: u16) {
         web_sys::console::error_1(&format!("Invalid instruction {:X}", opcode).into())
     }
@@ -394,6 +440,19 @@ mod tests {
         chip8.store(0, 5);
         chip8.jump_to_plus_v0(10);
         assert_eq!(chip8.pc, 15);
+
+        chip8.keydown(0xa);
+        chip8.skip_if_pressed(0xb);
+        assert_eq!(chip8.pc, 15);
+        chip8.skip_if_not_pressed(0xa);
+        assert_eq!(chip8.pc, 15);
+        chip8.skip_if_pressed(0xa);
+        assert_eq!(chip8.pc, 17);
+        chip8.skip_if_not_pressed(0xb);
+        assert_eq!(chip8.pc, 19);
+        chip8.keyup(0xa);
+        chip8.skip_if_pressed(0xa);
+        assert_eq!(chip8.pc, 19);
     }
 
     #[test]
