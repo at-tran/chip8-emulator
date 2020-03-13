@@ -7,8 +7,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use wasm_bindgen_futures::JsFuture;
-use web_sys::Response;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
+use web_sys::{
+    window, CanvasRenderingContext2d, HtmlCanvasElement, HtmlSelectElement, KeyboardEvent,
+    Performance, Response,
+};
 
 // When the `wee_alloc` feature is enabled, this uses `wee_alloc` as the global
 // allocator.
@@ -30,23 +33,18 @@ pub async fn main_js() {
     #[cfg(debug_assertions)]
     console_error_panic_hook::set_once();
 
-    let mut chip8 = Rc::new(RefCell::new(Chip8Emulator::new(get_current_time())));
+    let chip8 = Rc::new(RefCell::new(Chip8Emulator::new(get_current_time())));
 
     set_canvas_size(
         chip8.borrow().get_gfx_width(),
         chip8.borrow().get_gfx_height(),
     );
 
-    let rom_name = "INVADERS";
-    let path = format!("{}/{}", ROMS_DIR, rom_name);
-
-    let buffer = get_binary_file(&path)
-        .await
-        .expect(&format!("Can't load {}", path));
-
-    chip8.borrow_mut().load_rom(&buffer);
+    load_rom(&mut chip8.borrow_mut(), "INVADERS").await;
 
     register_inputs(&chip8);
+
+    register_rom_select(&chip8);
 
     Interval::new(1, move || {
         let mut chip8 = chip8.borrow_mut();
@@ -58,6 +56,17 @@ pub async fn main_js() {
         }
     })
     .forget();
+}
+
+async fn load_rom(chip8: &mut Chip8Emulator, rom_name: &str) {
+    chip8.reset(get_current_time());
+    let path = format!("{}/{}", ROMS_DIR, rom_name);
+
+    let buffer = get_binary_file(&path)
+        .await
+        .expect(&format!("Can't load {}", path));
+
+    chip8.load_rom(&buffer);
 }
 
 fn set_canvas_size(width: u32, height: u32) {
@@ -101,6 +110,35 @@ async fn get_binary_file(path: &str) -> Result<Vec<u8>, JsValue> {
     Ok(Uint8Array::new(&buffer).to_vec())
 }
 
+fn register_rom_select(chip8: &Rc<RefCell<Chip8Emulator>>) {
+    let rom_name_select = window()
+        .unwrap()
+        .document()
+        .unwrap()
+        .get_element_by_id("rom-name")
+        .expect("No element with id #rom-name")
+        .dyn_into::<HtmlSelectElement>()
+        .expect("Element with id #rom-name is not a select element");
+
+    let chip8 = Rc::clone(&chip8);
+    EventListener::new(&rom_name_select, "change", move |e| {
+        let e = e.clone();
+        let chip8 = Rc::clone(&chip8);
+        spawn_local(async move {
+            load_rom(
+                &mut chip8.borrow_mut(),
+                &e.target()
+                    .unwrap()
+                    .dyn_into::<HtmlSelectElement>()
+                    .unwrap()
+                    .value(),
+            )
+            .await;
+        });
+    })
+    .forget();
+}
+
 fn register_inputs(chip8: &Rc<RefCell<Chip8Emulator>>) {
     add_input_event(chip8, "keydown", |chip8, key| {
         chip8.borrow_mut().keydown(key);
@@ -118,7 +156,7 @@ where
     let chip8 = Rc::clone(&chip8);
 
     EventListener::new(&web_sys::window().unwrap(), event, move |e| {
-        let e: web_sys::KeyboardEvent = e.clone().dyn_into().unwrap();
+        let e: KeyboardEvent = e.clone().dyn_into().unwrap();
         if let Some(key) = jskey_to_chip8key(&e.key()) {
             f(&chip8, key);
         }
@@ -149,29 +187,22 @@ fn jskey_to_chip8key(key: &str) -> Option<u8> {
 }
 
 thread_local! {
-    static PERFORMANCE: web_sys::Performance =
-        web_sys::window().unwrap().performance().unwrap();
+    static PERFORMANCE: Performance =
+        window().unwrap().performance().unwrap();
 
-    static CONTEXT: web_sys::CanvasRenderingContext2d =
-        web_sys::window().unwrap().document().unwrap()
+    static CONTEXT: CanvasRenderingContext2d =
+        window().unwrap().document().unwrap()
             .get_element_by_id("canvas").expect("No element with id #canvas")
-            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .dyn_into::<HtmlCanvasElement>()
             .expect("Element with id #canvas is not a canvas")
             .get_context("2d").unwrap().unwrap()
-            .dyn_into::<web_sys::CanvasRenderingContext2d>().unwrap();
+            .dyn_into::<CanvasRenderingContext2d>().unwrap();
 }
 
 fn get_current_time() -> f64 {
     PERFORMANCE.with(|p| p.now())
 }
 
-fn get_context() -> web_sys::CanvasRenderingContext2d {
+fn get_context() -> CanvasRenderingContext2d {
     CONTEXT.with(|c| c.clone())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
-    wasm_bindgen_test_configure!(run_in_browser);
 }
