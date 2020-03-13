@@ -65,7 +65,7 @@ impl Chip8Emulator {
             sound_timer: Chip8Timer::new(current_time),
             stack: ArrayVec::new(),
             keypad: KeyPad::new(),
-            timer: Timer::new(current_time, 1000.0 / 800.0),
+            timer: Timer::new(current_time, 1000.0 / 600.0),
         }
     }
 

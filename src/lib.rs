@@ -73,6 +73,14 @@ async fn load_rom(chip8: &Rc<RefCell<Chip8Emulator>>, rom_name: &str) {
         .expect(&format!("Can't load {}", path));
 
     chip8.borrow_mut().reset(get_current_time());
+
+    let tps_select = get_element_by_id("ticks-per-second")
+        .dyn_into::<HtmlInputElement>()
+        .expect("Element with id #ticks-per-second is not an input element");
+    chip8
+        .borrow_mut()
+        .set_ticks_per_second(tps_select.value().parse().unwrap());
+
     chip8.borrow_mut().load_rom(&buffer);
 }
 
@@ -141,7 +149,7 @@ fn register_tps_select(chip8: &Rc<RefCell<Chip8Emulator>>) {
         .expect("Element with id #ticks-per-second is not an input element");
 
     let chip8 = Rc::clone(&chip8);
-    EventListener::new(&tps_select, "change", move |e| {
+    EventListener::new(&tps_select, "input", move |e| {
         let e = e.target().unwrap();
         e.dyn_ref::<HtmlElement>().unwrap().blur().unwrap();
         let new_tps = e

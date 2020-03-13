@@ -1,5 +1,6 @@
 body
   background-color: black
+  --terminal-color: #00a86b
 
 canvas
   width: 80vw
@@ -7,11 +8,36 @@ canvas
   margin-left: auto
   margin-right: auto
   image-rendering: pixelated
-  border: 1px solid #00a86b
+  image-rendering: -moz-crisp-edges
+  border: 1px solid var(--terminal-color)
 
 .rom-select-box
-  display: block
-  border-radius: 2px
+  border-radius: 3px
+  background-color: black
+  font-size: 1.2em
+  padding: 0.25em
+  border: 1px solid var(--terminal-color)
+  color: var(--terminal-color)
+  margin-left: 35vw
+  margin-right: 2em
+
+.ticks-per-second
+  fill: var(--terminal-color)
+  stroke: none
+  -webkit-appearance: none
+  background-color: var(--terminal-color)
+  width: 15em
+  height: 0.25em
+  margin-top: 2em
+  margin-bottom: 2em
+  margin-right: 1em
+
+.ticks-per-second::-webkit-slider-thumb
+  -webkit-appearance: none
+  background-color: var(--terminal-color)
+  width: 0.8em
+  height: 2em
 
 .ticks-per-second-text
-  color: #00a86b
+  color: var(--terminal-color)
+  font-size: 1.2em
