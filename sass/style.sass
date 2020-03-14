@@ -11,6 +11,13 @@ canvas
   image-rendering: -moz-crisp-edges
   border: 1px solid var(--terminal-color)
 
+.controls
+  text-align: center
+  margin-bottom: 1.5em
+
+.controls * + *
+  margin-left: 2rem
+
 .rom-select-box
   border-radius: 3px
   background-color: black
@@ -18,8 +25,6 @@ canvas
   padding: 0.25em
   border: 1px solid var(--terminal-color)
   color: var(--terminal-color)
-  margin-left: 35vw
-  margin-right: 2em
 
 .ticks-per-second
   fill: var(--terminal-color)
@@ -28,11 +33,14 @@ canvas
   background-color: var(--terminal-color)
   width: 15em
   height: 0.25em
-  margin-top: 2em
-  margin-bottom: 2em
-  margin-right: 1em
 
 .ticks-per-second::-webkit-slider-thumb
+  -webkit-appearance: none
+  background-color: var(--terminal-color)
+  width: 0.8em
+  height: 2em
+
+.ticks-per-second::-moz-range-thumb
   -webkit-appearance: none
   background-color: var(--terminal-color)
   width: 0.8em
